@@ -1,13 +1,14 @@
 //! `validation-report` subcommand — in-process validation tier checks.
 
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use clinrand_core::{
     check_properties, generate, permute, uniform_below, Arm, BlockScheme, DrawPurpose, Method,
     NumberingScheme, Rng, StratificationFactor, StreamDraw, StreamLog, StudyConfig, U64Draw,
     UniformError, ValidateOptions,
 };
+use clinrand_package::{check_regression_case, load_regression_cases, RegressionOutcome};
 
 use crate::exit::ExitCode;
 use crate::output::write_stdout;
@@ -28,7 +29,7 @@ const REGRESSION_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../validat
 
 const REFERENCE_EVIDENCE: &str = "Correctness against external normative sources (RFC 8439, hand-worked derivations). Expected values are not this engine's own output.";
 const PROPERTIES_EVIDENCE: &str = "Invariant evidence only — not external-oracle correctness. A passing sweep means P01–P09 held for sampled configs; it does not prove the algorithm matches an independent reference. Full 1000-case CI suite: `cargo test -p clinrand-core --test properties_proptest`.";
-const REGRESSION_EVIDENCE: &str = "Frozen engine output consistency — proves nothing changed since the last approved ALGO_VERSION, not that the algorithm is correct. Regression fixtures arrive in Phase 9.";
+const REGRESSION_EVIDENCE: &str = "Frozen engine output consistency — proves nothing changed since the last approved ALGO_VERSION, not that the algorithm is correct. See validation/regression/README.md.";
 
 const PROPERTIES_SWEEP_CASES: u32 = 100;
 const PROPERTIES_RNG_SEED: [u8; 32] = [0x50; 32];
@@ -450,56 +451,96 @@ fn property_config(index: u32) -> StudyConfig {
 }
 
 fn run_regression_tier() -> TierSection {
-    let fixture_count = count_regression_fixtures(Path::new(REGRESSION_DIR));
-    if fixture_count == 0 {
+    let algo_dirs = find_algo_version_dirs(Path::new(REGRESSION_DIR));
+    if algo_dirs.is_empty() {
         return TierSection {
             name: "Regression",
             evidence: REGRESSION_EVIDENCE,
             outcome: TierOutcome::Skip,
-            summary: "SKIP — 0 fixtures (regression fixtures arrive in Phase 9)".into(),
+            summary: "SKIP — no validation/regression/algo-v* fixture directories found".into(),
             groups: vec![CaseGroup {
                 name: "regression-fixtures".into(),
                 lines: vec![CaseLine {
                     label: "fixtures".into(),
                     outcome: TierOutcome::Skip,
-                    detail: Some(
-                        "validation/regression/ is missing or empty; frozen output checks deferred to Phase 9"
-                            .into(),
-                    ),
+                    detail: Some("validation/regression/ has no algo-v* directory".into()),
                 }],
             }],
         };
     }
 
+    let groups: Vec<CaseGroup> = algo_dirs.iter().map(|dir| regression_group(dir)).collect();
+    let outcome = tier_outcome_from_groups(&groups);
+    let passed = count_passed(&groups);
+    let total = count_total(&groups);
+
     TierSection {
         name: "Regression",
         evidence: REGRESSION_EVIDENCE,
-        outcome: TierOutcome::Skip,
-        summary: format!(
-            "SKIP — {fixture_count} fixture dirs present; execution deferred to Phase 9"
-        ),
-        groups: vec![CaseGroup {
-            name: "regression-fixtures".into(),
-            lines: vec![CaseLine {
-                label: "fixtures".into(),
-                outcome: TierOutcome::Skip,
-                detail: Some(format!(
-                    "{fixture_count} fixture director(ies) found; list_sha256 checks deferred to Phase 9"
-                )),
-            }],
-        }],
+        outcome,
+        summary: format!("{passed}/{total} regression fixtures matched frozen expectations"),
+        groups,
     }
 }
 
-fn count_regression_fixtures(dir: &Path) -> usize {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return 0;
+/// Load and check every fixture in one `algo-vN/` directory.
+fn regression_group(dir: &Path) -> CaseGroup {
+    let name = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("algo-v?")
+        .to_string();
+
+    let lines = match load_regression_cases(dir) {
+        Ok(cases) => cases
+            .iter()
+            .map(|case| {
+                let outcome = match generate(&case.config, case.seed) {
+                    Ok(list) => check_regression_case(case, &list),
+                    Err(err) => RegressionOutcome {
+                        case_id: case.case_id.clone(),
+                        passed: false,
+                        failures: vec![format!("generate failed: {err}")],
+                    },
+                };
+                CaseLine {
+                    label: outcome.case_id,
+                    outcome: if outcome.passed {
+                        TierOutcome::Pass
+                    } else {
+                        TierOutcome::Fail
+                    },
+                    detail: (!outcome.failures.is_empty()).then(|| outcome.failures.join("; ")),
+                }
+            })
+            .collect(),
+        Err(err) => vec![CaseLine {
+            label: name.clone(),
+            outcome: TierOutcome::Fail,
+            detail: Some(format!("failed to load fixtures: {err}")),
+        }],
     };
-    entries
+
+    CaseGroup { name, lines }
+}
+
+/// `algo-v*` subdirectories directly inside `dir`, sorted by name.
+fn find_algo_version_dirs(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = entries
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .filter(|entry| entry.file_name().to_string_lossy().starts_with("algo-v"))
-        .count()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("algo-v"))
+        })
+        .collect();
+    dirs.sort();
+    dirs
 }
 
 fn tier_outcome_from_groups(groups: &[CaseGroup]) -> TierOutcome {

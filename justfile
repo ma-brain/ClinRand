@@ -1,5 +1,12 @@
 # Project command aliases.
 
+# Needed so `cli`'s `*ARGS` reaches the recipe body as real positional
+# parameters ($@) instead of one space-joined string — otherwise a quoted
+# multi-word argument (e.g. `--operator "Jane Statistician"`) gets re-split
+# on whitespace and breaks. See `just --help` / the `positional-arguments`
+# setting.
+set positional-arguments := true
+
 # Fetch workspace dependencies.
 setup:
     cargo fetch
@@ -25,9 +32,10 @@ lint:
 build:
     cargo build --workspace --release
 
-# Run the CLI wrapper.
+# Run the CLI wrapper. Uses "$@" (not {{ARGS}}) so quoted multi-word
+# arguments survive — see the `positional-arguments` setting above.
 cli *ARGS:
-    cargo run -p clinrand-cli -- {{ARGS}}
+    cargo run -p clinrand-cli -- "$@"
 
 # Frontend diagnostics + build, then Tauri host fmt/clippy/check/test.
 # Requires Node + Rust + system webview deps (see apps/desktop/README.md).

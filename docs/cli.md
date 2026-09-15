@@ -8,7 +8,7 @@ I/O, exit codes, and output formatting.
 Run commands via the project wrapper or directly:
 
 ```bash
-just cli -- generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
+just cli generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
 cargo run -p clinrand-cli -- generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
 ```
 
@@ -41,8 +41,8 @@ algorithm version than the running binary, reproduction is refused outright.
 Print supported randomization methods.
 
 ```bash
-just cli -- list-methods
-just cli -- --json list-methods
+just cli list-methods
+just cli --json list-methods
 ```
 
 Human output: one method per line (`simple`, `permuted_block`, `stratified_block`).
@@ -56,8 +56,8 @@ Exit `0` on success.
 Validate a study configuration file without generating a list.
 
 ```bash
-just cli -- validate-config --config examples/simple.json
-just cli -- --json validate-config --config examples/simple.json
+just cli validate-config --config examples/simple.json
+just cli --json validate-config --config examples/simple.json
 ```
 
 | Option | Description |
@@ -75,7 +75,7 @@ JSON output includes `ok`, `errors`, and `warnings` arrays.
 Draw a fresh 256-bit seed, allocate a list, and write a full output package.
 
 ```bash
-just cli -- generate \
+just cli generate \
   --config examples/simple.json \
   --out /tmp/clinrand-out \
   --operator "Jane Statistician"
@@ -116,7 +116,7 @@ Regenerate a list from `manifest.unblinded.json` and assert the new
 `list_sha256` matches the manifest.
 
 ```bash
-just cli -- reproduce \
+just cli reproduce \
   --manifest /path/to/pkg/manifest.unblinded.json \
   --out /tmp/repro-out
 ```
@@ -142,7 +142,7 @@ Decrypt a package's `restricted.age` **in place**, writing `list.csv`,
 `unblinded-report.html` directly into the package directory as plaintext.
 
 ```bash
-just cli -- decrypt --package /path/to/pkg
+just cli decrypt --package /path/to/pkg
 ```
 
 | Option | Description |
@@ -163,9 +163,9 @@ Decrypting in place means `qc.R` (already present in the package directory)
 and `verify` work against the package directory unchanged immediately after:
 
 ```bash
-just cli -- decrypt --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
+just cli decrypt --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
 Rscript ~/clinrand-packages/DEMO-SIMPLE-1_.../qc.R
-just cli -- verify --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
+just cli verify --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
 ```
 
 ### `verify`
@@ -174,8 +174,8 @@ Recompute every hash in `checksums.txt` and re-run property checks against
 `list.csv` without regenerating.
 
 ```bash
-just cli -- verify --package /path/to/pkg
-just cli -- --json verify --package /path/to/pkg
+just cli verify --package /path/to/pkg
+just cli --json verify --package /path/to/pkg
 ```
 
 | Option | Description |
@@ -202,11 +202,11 @@ still encrypted; run \`decrypt\` first)`. Run `decrypt` to get full
 Run validation-tier checks and emit a report to stdout.
 
 ```bash
-just cli -- validation-report
-just cli -- validation-report --tier reference --format md
-just cli -- validation-report --tier properties --format html
-just cli -- validation-report --tier regression --format md
-just cli -- validation-report --tier all --format md
+just cli validation-report
+just cli validation-report --tier reference --format md
+just cli validation-report --tier properties --format html
+just cli validation-report --tier regression --format md
+just cli validation-report --tier all --format md
 ```
 
 | Option | Description |
@@ -222,8 +222,8 @@ Exit `3` on I/O errors reading validation fixtures.
 Print engine and algorithm version information.
 
 ```bash
-just cli -- version
-just cli -- --json version
+just cli version
+just cli --json version
 ```
 
 Human output includes `engine_version`, `rng_crate_version`, and
@@ -235,19 +235,19 @@ Exit `0` on success.
 
 ```bash
 # 1. Validate configuration
-just cli -- validate-config --config examples/simple.json
+just cli validate-config --config examples/simple.json
 
 # 2. Generate a package (seed drawn from OS entropy — not logged)
-just cli -- generate \
+just cli generate \
   --config examples/simple.json \
   --out ~/clinrand-packages \
   --operator "Jane Statistician"
 
 # 3. Verify the package
-just cli -- verify --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
+just cli verify --package ~/clinrand-packages/DEMO-SIMPLE-1_.../
 
 # 4. Reproduce from the unblinded manifest (QC / inspection)
-just cli -- reproduce \
+just cli reproduce \
   --manifest ~/clinrand-packages/DEMO-SIMPLE-1_.../manifest.unblinded.json \
   --out ~/clinrand-repro
 ```

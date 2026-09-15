@@ -1,0 +1,23 @@
+{
+  "case_id": "algo-v1-simple-global",
+  "seed_hex": "9001000000000000000000000000000000000000000000000000000000000009",
+  "config": {
+    "schema_version": "1.0",
+    "study_id": "DEMO-SIMPLE-1",
+    "protocol_version": "1.0",
+    "arms": [
+      { "code": "A", "label": "Active", "ratio": 1 },
+      { "code": "P", "label": "Placebo", "ratio": 1 }
+    ],
+    "method": "simple",
+    "strata": [],
+    "list_length_per_stratum": 24,
+    "numbering": { "kind": "global", "start": 10001, "width": 5 }
+  },
+  "expected": {
+    "config_sha256": "8ea5eaa6642e22468dabfb5d0c44cc3cfc3fdf8cc659d93a0f0239b4f21ff9a2",
+    "list_sha256": "980bf921336f141aa29674a17f5774fb46b757c822b0717c4392e78aef84fe84",
+    "stream_sha256": "a6e4ab8ab1f47eac469e247a4391dcf87e50e8c6174a4ef56a8c51d1f503f8aa",
+    "record_count": 24
+  }
+}
