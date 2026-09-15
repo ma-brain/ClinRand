@@ -1,8 +1,8 @@
 //! Filesystem package writer and `checksums.txt` (plan §6).
 //!
 //! Writes exact bytes from the list/stream renderers,
-//! [`crate::build_manifests`], and HTML report renderers. Does not
-//! re-serialize manifests. Does not emit `qc.R` or encrypted containers.
+//! [`crate::build_manifests`], HTML report renderers, and [`crate::render_qc_r`].
+//! Does not re-serialize manifests or write encrypted containers.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,6 +13,7 @@ use crate::canonical::{config_sha256, sha256_hex};
 use crate::error::PackageError;
 use crate::list::{render_list_csv, render_list_json};
 use crate::manifest::{build_manifests, seed_sha256, PackageMeta};
+use crate::qc::render_qc_r;
 use crate::report::{render_generation_report, render_unblinded_report, ReportFileHashes};
 use crate::stream::render_stream_csv;
 
@@ -25,6 +26,7 @@ const PACKAGE_FILES: &[&str] = &[
     "list.json",
     "manifest.blinded.json",
     "manifest.unblinded.json",
+    "qc.R",
     "stream.csv",
     "unblinded-report.html",
 ];
@@ -34,7 +36,7 @@ const PACKAGE_FILES: &[&str] = &[
 /// Creates
 /// `<out_dir>/<study_id>_<generated_at compact>_<first 8 hex of list_sha256>/`
 /// containing `list.csv`, `list.json`, `stream.csv`, both manifests, both HTML
-/// reports, and `checksums.txt`. Does not write `qc.R`.
+/// reports, `qc.R`, and `checksums.txt`.
 ///
 /// Manifest file bytes are exactly those returned by [`build_manifests`].
 /// `list.csv` / `list.json` / `stream.csv` are exactly the renderer outputs.
@@ -72,6 +74,7 @@ pub fn write_package(
 
     let generation_report = render_generation_report(cfg, list, meta, &hashes);
     let unblinded_report = render_unblinded_report(cfg, list, meta, &hashes);
+    let qc_r = render_qc_r(cfg)?;
 
     let dir_name = format!(
         "{}_{}_{}",
@@ -87,12 +90,13 @@ pub fn write_package(
 
     fs::create_dir_all(&package_dir).map_err(PackageError::from)?;
 
-    let contents: [(&str, &[u8]); 7] = [
+    let contents: [(&str, &[u8]); 8] = [
         ("generation-report.html", generation_report.as_bytes()),
         ("list.csv", list_csv.as_bytes()),
         ("list.json", list_json.as_bytes()),
         ("manifest.blinded.json", manifests.blinded.as_bytes()),
         ("manifest.unblinded.json", manifests.unblinded.as_bytes()),
+        ("qc.R", qc_r.as_bytes()),
         ("stream.csv", stream_csv.as_bytes()),
         ("unblinded-report.html", unblinded_report.as_bytes()),
     ];
@@ -166,6 +170,7 @@ mod tests {
             ("manifest.unblinded.json", b"u\n"),
             ("manifest.blinded.json", b"b\n"),
             ("generation-report.html", b"g\n"),
+            ("qc.R", b"q\n"),
             ("unblinded-report.html", b"ub\n"),
         ]);
         let names: Vec<&str> = body

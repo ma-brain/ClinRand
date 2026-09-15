@@ -1,8 +1,7 @@
 //! `render_qc_r` embeds study fields, and a rendered `qc.R` QCs a real package.
 //!
-//! Task 1 validates the template before `write_package` emits `qc.R` itself
-//! (Task 2): we write a package with the existing `write_package`, drop the
-//! rendered `qc.R` beside it, and run `Rscript qc.R` from the package directory.
+//! `write_package` emits `qc.R`; these tests run `Rscript qc.R` from the package
+//! directory to assert PASS/FAIL behaviour.
 //!
 //! Synthetic DEMO study IDs only. The seed appears on disk only in
 //! `manifest.unblinded.json`; `qc.R` never prints it.
@@ -54,13 +53,10 @@ fn run_qc(package_dir: &Path) -> Output {
     }
 }
 
-/// Write a package for `cfg`/`seed` and drop a rendered `qc.R` beside it.
+/// Write a package for `cfg`/`seed` (includes `qc.R` from `write_package`).
 fn write_package_with_qc(cfg: &StudyConfig, dir: &Path) -> std::path::PathBuf {
     let list = generate(cfg, seed()).expect("generate");
-    let package_dir = write_package(dir, cfg, &list, &seed(), &meta()).expect("write_package");
-    let qc = render_qc_r(cfg).expect("render_qc_r");
-    std::fs::write(package_dir.join("qc.R"), qc).expect("write qc.R");
-    package_dir
+    write_package(dir, cfg, &list, &seed(), &meta()).expect("write_package")
 }
 
 fn assert_pass(cfg: &StudyConfig) {
