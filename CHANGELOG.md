@@ -10,6 +10,11 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Property suite (`proptest`, 1000 cases) and named determinism tests in
+  `clinrand-core`: arbitrary valid configs must satisfy P01–P09 via
+  `all_required_passed`, and `generate` is byte-stable under a fixed seed
+  while a one-bit seed flip changes the list. Epistemic note under
+  `validation/properties/README.md`.
 - `check_properties` / `PropertyReport` in `clinrand-core` for plan §7
   checks P01–P10. P10 is informational only and never fails. P03 skips
   truncated final blocks; simple size-1 blocks skip ratio-bearing P03/P09
