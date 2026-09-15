@@ -48,6 +48,10 @@ pub enum GenerationError {
     /// Integer arithmetic overflowed while building or numbering the list.
     #[error("allocation-path arithmetic overflow")]
     Overflow,
+    /// Block construction parameters violate invariants that
+    /// [`validate_config`] should already have enforced (defensive belt).
+    #[error("block size {block_size} is not a multiple of ratio sum {ratio_sum}")]
+    InconsistentConfig { block_size: u32, ratio_sum: u32 },
 }
 
 /// Mutable state shared across strata for one generation run.
@@ -242,14 +246,25 @@ fn resolve_block_size(
 
 /// Build the arm multiset for one block: for each arm in config order, append
 /// `code` exactly `ratio * (block_size / ratio_sum)` times.
-fn build_arm_multiset(
+///
+/// Rejects a non-multiple `block_size` / `ratio_sum` rather than silently
+/// dropping a remainder. `validate_config` already rejects this for normal
+/// configs; this is a defensive belt on the allocation path.
+pub(crate) fn build_arm_multiset(
     arms: &[Arm],
     block_size: u32,
     ratio_sum: u32,
 ) -> Result<Vec<String>, GenerationError> {
-    let unit = block_size
-        .checked_div(ratio_sum)
-        .ok_or(GenerationError::Overflow)?;
+    if ratio_sum == 0 {
+        return Err(GenerationError::Overflow);
+    }
+    if !block_size.is_multiple_of(ratio_sum) {
+        return Err(GenerationError::InconsistentConfig {
+            block_size,
+            ratio_sum,
+        });
+    }
+    let unit = block_size / ratio_sum;
     let mut items = Vec::new();
     for arm in arms {
         let count = arm
@@ -301,5 +316,43 @@ fn format_number(value: u32, width: u8) -> String {
         raw
     } else {
         format!("{value:0>width$}", width = w)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn arms_2_1() -> Vec<Arm> {
+        vec![
+            Arm {
+                code: "A".into(),
+                label: "Active".into(),
+                ratio: 2,
+            },
+            Arm {
+                code: "P".into(),
+                label: "Placebo".into(),
+                ratio: 1,
+            },
+        ]
+    }
+
+    #[test]
+    fn build_arm_multiset_rejects_non_multiple_block_size() {
+        let err = build_arm_multiset(&arms_2_1(), 5, 3).expect_err("5 % 3 != 0");
+        assert_eq!(
+            err,
+            GenerationError::InconsistentConfig {
+                block_size: 5,
+                ratio_sum: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn build_arm_multiset_config_order_contiguous_counts() {
+        let items = build_arm_multiset(&arms_2_1(), 6, 3).expect("6 is multiple of 3");
+        assert_eq!(items, vec!["A", "A", "A", "A", "P", "P"]);
     }
 }

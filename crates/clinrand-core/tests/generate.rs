@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 
 use clinrand_core::{
-    generate, Arm, BlockScheme, DrawPurpose, Method, NumberingScheme, StratificationFactor,
-    StudyConfig, ALGO_VERSION,
+    generate, Arm, BlockScheme, ConfigError, DrawPurpose, GenerationError, Method, NumberingScheme,
+    StratificationFactor, StudyConfig, ALGO_VERSION,
 };
 
 fn seed_a() -> [u8; 32] {
@@ -130,11 +130,15 @@ fn generate_rejects_invalid_config() {
         ratio: 1,
     }];
     let err = generate(&cfg, seed_a()).expect_err("too few arms must fail");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("config") || msg.contains("arm") || msg.contains("validation"),
-        "unexpected error text: {msg}"
-    );
+    match err {
+        GenerationError::InvalidConfig(errors) => {
+            assert!(
+                errors.contains(&ConfigError::TooFewArms),
+                "expected TooFewArms among {errors:?}"
+            );
+        }
+        other => panic!("expected InvalidConfig, got {other:?}"),
+    }
 }
 
 #[test]

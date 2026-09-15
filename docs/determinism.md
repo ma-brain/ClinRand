@@ -153,10 +153,23 @@ For each stratum, and for each block in ascending block index:
 1. **Block size** (variable blocks only): draw
    `uniform_below(rng, log, sizes.len(), BlockSize)` and use the result to
    index into the sorted, deduplicated `sizes` array.
-2. Build the block's arm multiset from the integer allocation ratios.
+2. **Arm multiset:** for each arm in **config order**, append contiguous
+   copies of that arm's `code`, exactly
+   `ratio * (block_size / ratio_sum)` times. Block size is always a
+   multiple of `ratio_sum` (enforced by validation; the allocation path
+   also rejects a non-multiple rather than dropping a remainder).
 3. **Permute** the multiset with Fisher–Yates (§4).
 
 Fixed block size skips step 1.
+
+### Truncation (plan §5.5)
+
+If keeping the full block would exceed the remaining positions needed for
+`list_length_per_stratum`, the engine still builds and permutes the **full**
+block (consuming the full stream for that block), then keeps only the
+**leading** positions required to reach the target length. Truncated
+trailing positions are discarded after permutation; they never appear in
+the emitted list.
 
 ### Simple randomization
 
