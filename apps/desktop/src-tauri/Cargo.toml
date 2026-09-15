@@ -1,0 +1,45 @@
+# This crate is deliberately its OWN workspace root (empty [workspace] table
+# below) and is NOT listed in the root `Cargo.toml` members. Keeping the Tauri
+# host out of the root workspace means `cargo test --workspace` and CI for the
+# engine crates never have to compile the desktop GUI toolchain (webkit, etc.).
+# The desktop app still consumes the engine through ordinary path dependencies.
+[workspace]
+
+[package]
+name = "clinrand-desktop"
+version = "0.1.0"
+description = "ClinRand desktop application host"
+authors = ["ClinRand"]
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin on Windows.
+# See https://github.com/rust-lang/cargo/issues/8519
+name = "clinrand_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Engine and package crates via path — allocation/hashing/canonicalization stays
+# in these crates; the desktop host only wraps them in Tauri commands (Task 2+).
+clinrand-core = { path = "../../../crates/clinrand-core" }
+clinrand-package = { path = "../../../crates/clinrand-package" }
+
+tauri = { version = "2", features = [] }
+# Dialog + fs are the ONLY filesystem-touching plugins. No http/shell/process/updater.
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
