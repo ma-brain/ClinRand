@@ -1,0 +1,24 @@
+# Rust
+/target/
+**/target/
+
+# Node / pnpm (desktop app, Phase 7)
+node_modules/
+.pnpm-store/
+
+# SvelteKit / Tauri (desktop app, Phase 7)
+apps/desktop/.svelte-kit/
+apps/desktop/build/
+apps/desktop/src-tauri/target/
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+
+# Env
+.env
+.env.local
+
+# Local git worktrees
+.worktrees/
