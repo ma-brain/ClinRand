@@ -10,6 +10,8 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `StudyConfig` types and JSON serde in `clinrand-core`, matching plan
+  §4 / §5.1 (`method` string plus sibling `block` / `numbering`).
 - Phase 0 workspace scaffold: `clinrand-core`, `clinrand-package`,
   `clinrand-cli`, `justfile`, and CI on Linux, macOS, and Windows.
 - ChaCha20 generator in `clinrand-core` (`rand_chacha = "=0.3.1"`)

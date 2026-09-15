@@ -17,10 +17,12 @@
 /// regression fixture set. See plan §2.6.
 pub const ALGO_VERSION: u32 = 1;
 
+mod config;
 mod rng;
 mod stream;
 mod uniform;
 
+pub use config::{Arm, BlockScheme, Method, NumberingScheme, StratificationFactor, StudyConfig};
 pub use rng::Rng;
 pub use stream::{DrawPurpose, StreamDraw, StreamLog};
 pub use uniform::{uniform_below, U64Draw, UniformError};

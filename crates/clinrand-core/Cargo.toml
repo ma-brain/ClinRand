@@ -12,3 +12,9 @@ publish = false
 rand_chacha = "=0.3.1"
 # Version required by rand_chacha 0.3.1; RngCore / SeedableRng only.
 rand_core = "=0.6.4"
+# JSON (de)serialization of StudyConfig; required by the crate-boundary table.
+serde = { version = "=1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+# JSON fixtures for StudyConfig serde round-trip tests only.
+serde_json = "=1.0.151"
