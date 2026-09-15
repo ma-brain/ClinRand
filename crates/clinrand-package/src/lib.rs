@@ -10,6 +10,7 @@ mod csv_util;
 mod error;
 mod list;
 mod manifest;
+mod read;
 mod report;
 mod stream;
 mod write;
@@ -24,6 +25,7 @@ pub use list::{render_list_csv, render_list_json};
 pub use manifest::{
     build_manifests, seed_hex, seed_sha256, ManifestPair, PackageMeta, MANIFEST_SCHEMA_VERSION,
 };
+pub use read::{parse_checksums_txt, parse_list_csv, parse_unblinded_manifest, UnblindedManifest};
 pub use report::{render_generation_report, render_unblinded_report, ReportFileHashes};
 pub use stream::render_stream_csv;
 pub use write::{compact_generated_at, write_package};
