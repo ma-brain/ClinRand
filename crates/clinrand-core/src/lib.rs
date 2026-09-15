@@ -18,12 +18,14 @@
 pub const ALGO_VERSION: u32 = 1;
 
 mod config;
+mod permute;
 mod rng;
 mod stream;
 mod uniform;
 mod validate;
 
 pub use config::{Arm, BlockScheme, Method, NumberingScheme, StratificationFactor, StudyConfig};
+pub use permute::permute;
 pub use rng::Rng;
 pub use stream::{DrawPurpose, StreamDraw, StreamLog};
 pub use uniform::{uniform_below, U64Draw, UniformError};

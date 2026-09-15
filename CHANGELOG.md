@@ -10,6 +10,8 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Descending Fisher–Yates `permute` in `clinrand-core` (plan §2.3) with
+  hand-worked reference cases under `validation/reference/fisher-yates/`.
 - `canonical_json_value` in `clinrand-package`: the same plan §6.4
   canonicalizer over a `serde_json::Value`, so Phase 4 can reuse one
   implementation. `canonical_json(&StudyConfig)` calls it.

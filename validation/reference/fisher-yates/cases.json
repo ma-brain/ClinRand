@@ -1,0 +1,77 @@
+{
+  "primitiveId": "fisher-yates",
+  "cases": [
+    {
+      "caseId": "len_0_identity",
+      "source": "plan §2.3 empty slice",
+      "input": {
+        "items": [],
+        "keystream": ["5"]
+      },
+      "expect": {
+        "items": [],
+        "consumed": 0,
+        "stream": []
+      }
+    },
+    {
+      "caseId": "len_1_zero_consumption",
+      "source": "plan §2.3 length 1",
+      "input": {
+        "items": [42],
+        "keystream": ["5"]
+      },
+      "expect": {
+        "items": [42],
+        "consumed": 0,
+        "stream": []
+      }
+    },
+    {
+      "caseId": "len_2_one_draw_swap",
+      "source": "plan §2.3 length 2 with j != i",
+      "input": {
+        "items": [0, 1],
+        "keystream": ["6"]
+      },
+      "expect": {
+        "items": [1, 0],
+        "consumed": 1,
+        "stream": [
+          {
+            "index": 0,
+            "bound": 2,
+            "value": 0,
+            "purpose": "Permutation"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "len_3_descending_swaps",
+      "source": "plan §2.3 length 3 with j != i",
+      "input": {
+        "items": [0, 1, 2],
+        "keystream": ["4", "6"]
+      },
+      "expect": {
+        "items": [2, 0, 1],
+        "consumed": 2,
+        "stream": [
+          {
+            "index": 0,
+            "bound": 3,
+            "value": 1,
+            "purpose": "Permutation"
+          },
+          {
+            "index": 1,
+            "bound": 2,
+            "value": 0,
+            "purpose": "Permutation"
+          }
+        ]
+      }
+    }
+  ]
+}

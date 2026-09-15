@@ -135,10 +135,10 @@ for i in (1..len).rev():
 ```
 
 `j` is always in `0..(i + 1)` inclusive of `i`. The descending loop order is
-part of the contract.
+part of the contract. Length 0 and length 1 perform no draws.
 
-*(Implemented in Phase 3; specified here because it governs stream
-consumption.)*
+Implemented as `clinrand_core::permute`. Hand-worked reference cases live
+under [`validation/reference/fisher-yates/`](../validation/reference/fisher-yates/).
 
 ---
 
@@ -205,6 +205,7 @@ from the binary's. There is no bypass flag.
 |---|---|---|
 | Reference | [`validation/reference/chacha20/`](../validation/reference/chacha20/) | ChaCha20 keystream matches [RFC 8439](https://www.rfc-editor.org/rfc/rfc8439.html) §2.3.2 and §2.4.2 |
 | Reference | [`validation/reference/uniform-below/`](../validation/reference/uniform-below/) | `uniform_below` matches hand-worked rejection-sampling arithmetic |
+| Reference | [`validation/reference/fisher-yates/`](../validation/reference/fisher-yates/) | Descending Fisher–Yates matches hand-worked permutations over a documented keystream |
 
 These tiers carry **correctness** evidence from external or hand-derived
 norms. They are not regression fixtures; expected values were not taken from
