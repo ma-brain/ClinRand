@@ -10,6 +10,12 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `render_list_csv`, `render_list_json`, and `render_stream_csv` in
+  `clinrand-package`: in-memory UTF-8 LF emitters for plan §6 list and
+  stream files (no filesystem write). Stratum CSV/JSON columns follow
+  config factor order; trailing newline policy documented in
+  `docs/output-package.md`. No seed in these outputs. `ALGO_VERSION`
+  unchanged (1).
 - Property suite (`proptest`, 1000 cases) and named determinism tests in
   `clinrand-core`: arbitrary valid configs must satisfy P01–P09 via
   `all_required_passed`, and `generate` is byte-stable under a fixed seed

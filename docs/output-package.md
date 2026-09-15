@@ -1,11 +1,12 @@
-# Output package — canonical JSON and config hashing
+# Output package — canonical JSON, hashing, and list/stream renderers
 
-This document specifies how ClinRand produces **canonical JSON** and
-**`config_sha256`**. It is precise enough for an independent
-reimplementation of the hash. The rest of the output package (file list,
-`list.csv`, reports, manifests) is defined in
+This document specifies how ClinRand produces **canonical JSON**,
+**`config_sha256`**, and the in-memory **`list.csv` / `list.json` /
+`stream.csv`** byte layouts. Canonical JSON is precise enough for an
+independent reimplementation of the config hash. Manifests, filesystem
+writes, and reports are defined in
 [`docs/plans/clinrand-implementation-plan.md`](plans/clinrand-implementation-plan.md)
-§6 and is documented here in a later phase.
+§6 and will be documented here as those pieces land.
 
 A third party who follows this file, without reading the Rust sources,
 must obtain the same canonical bytes and the same SHA-256 for a given
@@ -35,6 +36,7 @@ Public API:
   no `0x` prefix
 - `config_sha256_digest(&StudyConfig) -> Result<[u8; 32], CanonicalError>` —
   the same digest as raw bytes
+- `render_list_csv` / `render_list_json` / `render_stream_csv` — see §6
 
 `ALGO_VERSION` is not involved. Changing canonicalization changes
 hashes in the package; it does not change the allocation stream.
@@ -182,3 +184,75 @@ Notes on that line:
 
 The same logical config with every object’s keys reversed must produce
 this exact string and this exact hex digest.
+
+---
+
+## 6. `list.csv`, `list.json`, and `stream.csv` (in-memory)
+
+These renderers live in `clinrand-package` and are pure functions of
+`GeneratedList` / `StreamLog` plus `StudyConfig` where needed. They do
+**not** write the filesystem, do **not** include the seed, and do **not**
+implement allocation.
+
+Public API:
+
+- `render_list_csv(&StudyConfig, &GeneratedList) -> Result<String, PackageError>`
+- `render_list_json(&StudyConfig, &GeneratedList) -> Result<String, PackageError>`
+- `render_stream_csv(&StreamLog) -> Result<String, PackageError>`
+
+### 6.1 Shared encoding
+
+- UTF-8 text, **LF** (`\n`) line endings, **no BOM**
+- Each file ends with **exactly one trailing `\n`** after the last row
+  (or after the header when there are no data rows). There is no extra
+  blank line.
+- CSV quoting is minimal RFC 4180-style: quote a field only if it
+  contains comma, `"`, or a newline; escape `"` as `""`. Synthetic
+  fixtures normally need no quotes.
+
+SHA-256 of these files (when manifests hash them) is the digest of these
+exact UTF-8 bytes, including the final newline.
+
+### 6.2 `list.csv` (plan §6.1)
+
+Header, then one row per `AllocationRecord` in list order:
+
+```text
+randomization_number,<one column per stratum factor>,block_id,block_size,position_in_block,arm_code
+```
+
+Stratum columns follow **config factor order** (`StudyConfig.strata`).
+Do not sort factor names. Empty `strata` → no stratum columns between
+`randomization_number` and `block_id`.
+
+### 6.3 `list.json`
+
+Structured equivalent of the same rows:
+
+```text
+{"records":[{...},{...}]}
+```
+
+plus a trailing `\n`. Each record object uses the **same keys as the
+CSV columns**, emitted in that same order (config factor order for
+stratum fields). Compact encoding: no insignificant whitespace. Keys are
+not lexicographically sorted (unlike §6.4 canonical JSON), so that
+stratum field order matches the CSV.
+
+### 6.4 `stream.csv`
+
+Header and columns:
+
+```text
+index,bound,value,purpose
+```
+
+One row per `StreamDraw` in log order. `purpose` is snake_case:
+
+| `DrawPurpose`       | CSV value            |
+|---------------------|----------------------|
+| `BlockSize`         | `block_size`         |
+| `Permutation`       | `permutation`        |
+| `SimpleAllocation`  | `simple_allocation`  |
+
+An empty stream is the header line plus trailing `\n` only.

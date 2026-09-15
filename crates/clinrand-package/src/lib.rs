@@ -6,11 +6,18 @@
 #![deny(clippy::all)]
 
 mod canonical;
+mod csv_util;
+mod error;
+mod list;
+mod stream;
 
 pub use canonical::{
     canonical_json, canonical_json_value, config_sha256, config_sha256_digest, CanonicalError,
 };
 pub use clinrand_core::ALGO_VERSION;
+pub use error::PackageError;
+pub use list::{render_list_csv, render_list_json};
+pub use stream::render_stream_csv;
 
 #[cfg(test)]
 mod tests {
