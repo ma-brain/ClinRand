@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/clinrand-core",
+    "crates/clinrand-package",
+    "crates/clinrand-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+repository = "https://github.com/ma-brain/ClinRand"

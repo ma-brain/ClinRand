@@ -1,0 +1,11 @@
+[package]
+name = "clinrand-package"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ClinRand output package reading, writing, hashing, and reports"
+publish = false
+
+[dependencies]
+clinrand-core = { path = "../clinrand-core" }

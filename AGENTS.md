@@ -1,6 +1,6 @@
 # AGENTS.md — ClinRand
 
-Operating rules for any coding agent working in this repository. Read this file completely before making any change. `docs/plans/implementation-plan.md` is the authoritative specification; this file tells you how to work within it.
+Operating rules for any coding agent working in this repository. Read this file completely before making any change. `docs/plans/clinrand-implementation-plan.md` is the authoritative specification; this file tells you how to work within it.
 
 If you only read one section, read **Determinism** below. It is the reason this project exists.
 
@@ -22,7 +22,7 @@ When unsure about anything in §3 or §4 below, stop and ask. A question costs m
 ## 2. Read order
 
 1. This file.
-2. `docs/plans/implementation-plan.md` — the specification. Section numbers referenced below are from this document.
+2. `docs/plans/clinrand-implementation-plan.md` — the specification. Section numbers referenced below are from this document.
 3. `docs/determinism.md` — the algorithm contract, once it exists.
 4. `validation/README.md` — what each validation tier means and does not mean.
 
