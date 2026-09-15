@@ -33,6 +33,7 @@ pub struct StudyConfig {
 
 /// Treatment arm (plan §4).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Arm {
     /// Short arm code written to the list.
     pub code: String,
@@ -58,7 +59,7 @@ pub enum Method {
 
 /// Block size scheme (plan §4).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BlockScheme {
     /// Every block has this size.
     Fixed { size: u32 },
@@ -68,6 +69,7 @@ pub enum BlockScheme {
 
 /// One stratification factor and its levels (plan §4).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StratificationFactor {
     /// Factor name, unique within a config.
     pub name: String,
@@ -80,7 +82,7 @@ pub struct StratificationFactor {
 /// `Global` is listed first so any defaulting lands on it, not
 /// `PerStratumRange`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum NumberingScheme {
     /// One ascending counter across the whole list.
     Global { start: u32, width: u8 },
@@ -93,6 +95,7 @@ pub enum NumberingScheme {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct StudyConfigWire {
     schema_version: String,
     study_id: String,

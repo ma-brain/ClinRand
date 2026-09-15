@@ -39,6 +39,9 @@ pub enum ConfigError {
     /// Sum of arm ratios does not fit in `u32`.
     #[error("arm ratio sum overflowed u32")]
     RatioSumOverflow,
+    /// Fixed `size` is 0, or a variable `sizes` entry is 0.
+    #[error("block size 0 is not allowed")]
+    BlockSizeZero,
     /// Fixed block size is not a multiple of the ratio sum.
     #[error("fixed block size {size} is not a multiple of ratio sum {ratio_sum}")]
     FixedBlockSizeNotMultiple { size: u32, ratio_sum: u32 },
@@ -215,6 +218,9 @@ fn checked_ratio_sum(arms: &[Arm], errors: &mut Vec<ConfigError>) -> Option<u32>
 fn check_block(block: &BlockScheme, ratio_sum: Option<u32>, errors: &mut Vec<ConfigError>) {
     match block {
         BlockScheme::Fixed { size } => {
+            if *size == 0 {
+                errors.push(ConfigError::BlockSizeZero);
+            }
             if let Some(sum) = ratio_sum {
                 if sum > 0 && !size.is_multiple_of(sum) {
                     errors.push(ConfigError::FixedBlockSizeNotMultiple {
@@ -232,6 +238,9 @@ fn check_block(block: &BlockScheme, ratio_sum: Option<u32>, errors: &mut Vec<Con
             let mut seen = HashSet::new();
             let mut reported_dup = HashSet::new();
             for &size in sizes {
+                if size == 0 {
+                    errors.push(ConfigError::BlockSizeZero);
+                }
                 if !seen.insert(size) && reported_dup.insert(size) {
                     errors.push(ConfigError::DuplicateBlockSize(size));
                 }

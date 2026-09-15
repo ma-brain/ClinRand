@@ -160,6 +160,35 @@ fn stratified_block_requires_block() {
 }
 
 #[test]
+fn extra_top_level_key_fails_deserialize() {
+    let mut value = base_object();
+    value["method"] = serde_json::json!("simple");
+    value["operator_notes"] = serde_json::json!("must not be dropped");
+    let err = serde_json::from_value::<StudyConfig>(value)
+        .expect_err("unknown top-level keys must fail deserialize");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("unknown") || msg.contains("operator_notes"),
+        "error should name the unknown field, got {msg}"
+    );
+}
+
+#[test]
+fn block_typo_blok_fails_deserialize() {
+    let mut value = base_object();
+    value["method"] = serde_json::json!("permuted_block");
+    value["block"] = serde_json::json!({ "kind": "fixed", "size": 4 });
+    value["blok"] = serde_json::json!({ "kind": "fixed", "size": 4 });
+    let err = serde_json::from_value::<StudyConfig>(value)
+        .expect_err("typo \"blok\" must fail deserialize, not be dropped");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("unknown") || msg.contains("blok"),
+        "error should mention the unknown field, got {msg}"
+    );
+}
+
+#[test]
 fn permuted_block_round_trips() {
     let mut value = base_object();
     value["method"] = serde_json::json!("permuted_block");

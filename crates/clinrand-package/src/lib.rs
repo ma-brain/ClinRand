@@ -7,14 +7,16 @@
 
 mod canonical;
 
-pub use canonical::{canonical_json, config_sha256, config_sha256_digest, CanonicalError};
+pub use canonical::{
+    canonical_json, canonical_json_value, config_sha256, config_sha256_digest, CanonicalError,
+};
 pub use clinrand_core::ALGO_VERSION;
 
 #[cfg(test)]
 mod tests {
     use clinrand_core::StudyConfig;
 
-    use super::{canonical_json, config_sha256, config_sha256_digest};
+    use super::{canonical_json, canonical_json_value, config_sha256, config_sha256_digest};
 
     /// Plan §5.1 shape; object keys in typical config-file order.
     const KEYS_SCHEMA_ORDER: &str = r#"{
@@ -140,5 +142,26 @@ mod tests {
         assert_eq!(digest.len(), 32);
         let from_digest: String = digest.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(from_digest, hex);
+    }
+
+    #[test]
+    fn canonical_json_value_of_parsed_demo_201_matches_typed_config() {
+        let cfg = parse(KEYS_SCHEMA_ORDER);
+        let typed = canonical_json(&cfg).expect("canonical JSON of typed config");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(KEYS_SCHEMA_ORDER).expect("DEMO-201 JSON");
+        let from_value = canonical_json_value(&parsed).expect("canonical JSON of parsed value");
+        assert_eq!(
+            typed, from_value,
+            "canonical_json_value of parsed DEMO-201 must match canonical_json of StudyConfig"
+        );
+
+        let reversed: serde_json::Value =
+            serde_json::from_str(KEYS_REVERSED).expect("reversed DEMO-201 JSON");
+        let from_reversed =
+            canonical_json_value(&reversed).expect("canonical JSON of reversed value");
+        assert_eq!(typed, from_reversed);
+        assert_eq!(from_value, EXPECTED_CANONICAL);
     }
 }

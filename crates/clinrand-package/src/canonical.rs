@@ -49,7 +49,15 @@ impl std::error::Error for CanonicalError {
 /// an `ALGO_VERSION` bump (the allocation path is unchanged).
 pub fn canonical_json(cfg: &StudyConfig) -> Result<String, CanonicalError> {
     let value = serde_json::to_value(cfg).map_err(CanonicalError::Serialize)?;
-    let canonical = canonicalize_value(value)?;
+    canonical_json_value(&value)
+}
+
+/// Compact canonical JSON of an arbitrary JSON value (plan §6.4 rules).
+///
+/// Same key-sort and integer-number rules as [`canonical_json`]. Phase 4
+/// reuses this so package files share one canonicalizer.
+pub fn canonical_json_value(value: &Value) -> Result<String, CanonicalError> {
+    let canonical = canonicalize_value(value.clone())?;
     serde_json::to_string(&canonical).map_err(CanonicalError::Serialize)
 }
 

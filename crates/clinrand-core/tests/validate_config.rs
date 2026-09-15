@@ -174,6 +174,26 @@ fn rejects_zero_ratio() {
 }
 
 #[test]
+fn rejects_fixed_block_size_zero() {
+    let mut cfg = valid_permuted();
+    match &mut cfg.method {
+        Method::PermutedBlock { block } => *block = BlockScheme::Fixed { size: 0 },
+        other => panic!("expected permuted_block, got {other:?}"),
+    }
+    assert_has_error(cfg, |e| matches!(e, ConfigError::BlockSizeZero));
+}
+
+#[test]
+fn rejects_variable_block_size_zero() {
+    let mut cfg = valid_permuted();
+    match &mut cfg.method {
+        Method::PermutedBlock { block } => *block = BlockScheme::Variable { sizes: vec![0, 2] },
+        other => panic!("expected permuted_block, got {other:?}"),
+    }
+    assert_has_error(cfg, |e| matches!(e, ConfigError::BlockSizeZero));
+}
+
+#[test]
 fn rejects_fixed_block_size_not_multiple_of_ratio_sum() {
     let mut cfg = valid_permuted();
     cfg.arms[0].ratio = 2;

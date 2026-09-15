@@ -26,6 +26,10 @@ SHA-256 and of any “what a path is” knowledge.
 Public API:
 
 - `canonical_json(&StudyConfig) -> Result<String, CanonicalError>`
+- `canonical_json_value(&serde_json::Value) -> Result<String, CanonicalError>` —
+  the same canonicalization applied to an already-parsed JSON value, so
+  Phase 4 can reuse one implementation for package files.
+  `canonical_json` serializes the typed config and calls this.
 - `config_sha256(&StudyConfig) -> Result<String, CanonicalError>` —
   **lowercase hex SHA-256 of the canonical UTF-8 bytes**, 64 characters,
   no `0x` prefix
@@ -47,8 +51,9 @@ Consequences:
 
 - Key order, insignificant whitespace, and Unicode escape choices in an
   input file do not affect the hash.
-- Unknown properties present in a file are dropped on deserialize and
-  are **not** hashed.
+- Unknown properties fail deserialize (`#[serde(deny_unknown_fields)]`
+  on the wire types, matching schema `additionalProperties: false`).
+  They cannot be silently dropped from the hashed typed config.
 - Optional `block` is omitted entirely when `method` is `"simple"`
   (`skip_serializing_if` on `None`). It is not serialized as `null`.
 - `method` is a JSON string (`"simple"`, `"permuted_block"`,
