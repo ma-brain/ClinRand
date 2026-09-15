@@ -10,6 +10,10 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `check_properties` / `PropertyReport` in `clinrand-core` for plan §7
+  checks P01–P10. P10 is informational only and never fails. P03 skips
+  truncated final blocks; simple size-1 blocks skip ratio-bearing P03/P09
+  rules. P09 uses integer one-block tolerance for block methods.
 - `generate` in `clinrand-core` for `simple`, `permuted_block`, and
   `stratified_block`: block truncation (§5.5), global and
   `per_stratum_range` numbering (§5.6), one shared RNG/stream per run.
