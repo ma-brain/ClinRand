@@ -12,6 +12,10 @@ dev:
 test:
     cargo test --workspace
 
+# Run qc.R PASS/FAIL integration tests (requires R + jsonlite + digest).
+qc:
+    cargo test -p clinrand-package --test qc_r
+
 # Lint and format-check.
 lint:
     cargo fmt --all -- --check
