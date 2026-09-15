@@ -1,12 +1,12 @@
 # Output package — canonical JSON, hashing, and list/stream renderers
 
 This document specifies how ClinRand produces **canonical JSON**,
-**`config_sha256`**, and the in-memory **`list.csv` / `list.json` /
-`stream.csv`** byte layouts. Canonical JSON is precise enough for an
-independent reimplementation of the config hash. Manifests, filesystem
-writes, and reports are defined in
-[`docs/plans/clinrand-implementation-plan.md`](plans/clinrand-implementation-plan.md)
-§6 and will be documented here as those pieces land.
+**`config_sha256`**, in-memory **`list.csv` / `list.json` /
+`stream.csv`** byte layouts, **manifests**, and the Phase 4
+**`write_package`** filesystem layout including **`checksums.txt`**.
+Canonical JSON is precise enough for an independent reimplementation
+of the config hash. HTML reports and `qc.R` are out of scope for this
+Phase 4 surface and are documented when those pieces land.
 
 A third party who follows this file, without reading the Rust sources,
 must obtain the same canonical bytes and the same SHA-256 for a given
@@ -37,6 +37,8 @@ Public API:
 - `config_sha256_digest(&StudyConfig) -> Result<[u8; 32], CanonicalError>` —
   the same digest as raw bytes
 - `render_list_csv` / `render_list_json` / `render_stream_csv` — see §6
+- `build_manifests` — see §7
+- `write_package` / `compact_generated_at` — see §8
 
 `ALGO_VERSION` is not involved. Changing canonicalization changes
 hashes in the package; it does not change the allocation stream.
@@ -296,3 +298,52 @@ includes `seed_sha256`.
 | `stream_sha256` | Exact UTF-8 bytes of `render_stream_csv` (including final `\n`) |
 
 All digests are SHA-256 encoded as 64 lowercase hex characters.
+
+---
+
+## 8. `write_package` and `checksums.txt`
+
+`write_package(out_dir, cfg, list, seed, meta) -> Result<PathBuf, PackageError>`
+creates a package directory and writes the Phase 4 file set (no `qc.R`,
+no HTML reports).
+
+### 8.1 Directory name
+
+```text
+<out_dir>/<study_id>_<generated_at compact>_<first 8 hex of list_sha256>/
+```
+
+`generated_at` is taken from `PackageMeta` (caller-supplied; no clock
+read). Compact form keeps ASCII alphanumerics only, so
+`2026-09-15T14:42:10Z` becomes `20260915T144210Z`. An already-compact
+value is left unchanged. `list_sha256` is SHA-256 of the exact
+`list.csv` UTF-8 bytes (§6.2), lowercase hex; the directory uses the
+first 8 characters.
+
+### 8.2 Files written
+
+| File | Source bytes |
+|---|---|
+| `list.csv` | `render_list_csv` |
+| `list.json` | `render_list_json` |
+| `stream.csv` | `render_stream_csv` |
+| `manifest.unblinded.json` | `ManifestPair.unblinded` from `build_manifests` |
+| `manifest.blinded.json` | `ManifestPair.blinded` from `build_manifests` |
+| `checksums.txt` | See §8.3 |
+
+Manifests are written as the exact `ManifestPair` strings — they are
+**not** re-serialized. The seed appears on disk only in
+`manifest.unblinded.json`.
+
+### 8.3 `checksums.txt`
+
+SHA-256 of every package file **except** `checksums.txt` itself.
+Format is GNU `sha256sum` **text mode**: one line per file
+
+```text
+<64 lowercase hex><two spaces><filename>\n
+```
+
+Lines are sorted by filename. Digests cover the exact UTF-8 bytes
+written to each file (including trailing newlines as specified above).
+

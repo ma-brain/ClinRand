@@ -11,6 +11,7 @@ mod error;
 mod list;
 mod manifest;
 mod stream;
+mod write;
 
 pub use canonical::{
     canonical_json, canonical_json_value, config_sha256, config_sha256_digest, sha256_hex,
@@ -23,6 +24,7 @@ pub use manifest::{
     build_manifests, seed_hex, seed_sha256, ManifestPair, PackageMeta, MANIFEST_SCHEMA_VERSION,
 };
 pub use stream::render_stream_csv;
+pub use write::{compact_generated_at, write_package};
 
 #[cfg(test)]
 mod tests {

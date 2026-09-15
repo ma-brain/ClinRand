@@ -10,6 +10,12 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `write_package` in `clinrand-package`: writes
+  `<study_id>_<compact generated_at>_<list_sha256[:8]>/` with
+  `list.csv` / `list.json` / `stream.csv`, both manifests (exact
+  `ManifestPair` bytes), and `checksums.txt` (GNU `sha256sum` text
+  mode, sorted by filename, excluding itself). No `qc.R` or HTML.
+  `ALGO_VERSION` unchanged (1).
 - Blinded and unblinded package manifests in `clinrand-package`
   (`build_manifests`): compact canonical JSON plus trailing `\n`;
   `list_sha256` / `stream_sha256` digest exact list/stream CSV UTF-8

@@ -1,10 +1,13 @@
-//! Errors from package rendering and (later) writing.
+//! Errors from package rendering and writing.
 
 use std::fmt;
+use std::io;
 
 use crate::canonical::CanonicalError;
 
-/// Failure producing package file bytes.
+/// Failure producing or writing package file bytes.
+///
+/// [`Display`](fmt::Display) never includes the seed.
 #[derive(Debug)]
 pub enum PackageError {
     /// An allocation record is missing a stratum factor required by the config.
@@ -16,11 +19,19 @@ pub enum PackageError {
     },
     /// Canonical JSON or `config_sha256` failed.
     Canonical(CanonicalError),
+    /// Filesystem create/write failed while assembling a package directory.
+    Io(io::Error),
 }
 
 impl From<CanonicalError> for PackageError {
     fn from(err: CanonicalError) -> Self {
         Self::Canonical(err)
+    }
+}
+
+impl From<io::Error> for PackageError {
+    fn from(err: io::Error) -> Self {
+        Self::Io(err)
     }
 }
 
@@ -35,6 +46,7 @@ impl fmt::Display for PackageError {
                 "allocation {randomization_number} is missing stratum factor `{factor}`"
             ),
             Self::Canonical(err) => write!(f, "{err}"),
+            Self::Io(err) => write!(f, "package I/O failed: {err}"),
         }
     }
 }
@@ -44,6 +56,7 @@ impl std::error::Error for PackageError {
         match self {
             Self::MissingStratumFactor { .. } => None,
             Self::Canonical(err) => Some(err),
+            Self::Io(err) => Some(err),
         }
     }
 }
