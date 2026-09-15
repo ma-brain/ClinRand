@@ -31,6 +31,54 @@ pub enum PackageError {
     Canonical(CanonicalError),
     /// Filesystem create/write failed while assembling a package directory.
     Io(io::Error),
+    /// `list.csv` is not well-formed CSV.
+    ListCsvParse {
+        /// Parse detail (never a seed).
+        detail: String,
+    },
+    /// `list.csv` header does not match the expected config column order.
+    ListCsvHeaderMismatch,
+    /// `list.csv` has a header but no data rows.
+    ListCsvNoDataRows,
+    /// A data row has the wrong number of columns.
+    ListCsvColumnCount {
+        /// 1-based row number in the file.
+        row: usize,
+        /// Expected column count from the header.
+        expected: usize,
+        /// Actual column count.
+        found: usize,
+    },
+    /// A numeric column in `list.csv` is not a valid `u32`.
+    ListCsvInvalidInteger {
+        /// Column name.
+        column: String,
+        /// 1-based row number in the file.
+        row: usize,
+    },
+    /// A `checksums.txt` line is not `hex  filename` (GNU text mode).
+    ChecksumsParse {
+        /// 1-based line number.
+        line: usize,
+    },
+    /// A digest on a `checksums.txt` line is not 64 lowercase hex digits.
+    ChecksumsInvalidDigest {
+        /// 1-based line number.
+        line: usize,
+    },
+    /// The same path appears twice in `checksums.txt`.
+    ChecksumsDuplicatePath {
+        /// Duplicate relative filename.
+        path: String,
+    },
+    /// `manifest.unblinded.json` is not valid JSON for the expected shape.
+    ManifestJsonParse,
+    /// `manifest.blinded.json` is not valid JSON for the expected shape.
+    BlindedManifestJsonParse,
+    /// `seed_hex` is not exactly 64 characters.
+    InvalidSeedHexLength,
+    /// `seed_hex` is not lowercase hexadecimal.
+    InvalidSeedHexEncoding,
 }
 
 impl From<CanonicalError> for PackageError {
@@ -66,6 +114,45 @@ impl fmt::Display for PackageError {
             ),
             Self::Canonical(err) => write!(f, "{err}"),
             Self::Io(err) => write!(f, "package I/O failed: {err}"),
+            Self::ListCsvParse { detail } => write!(f, "list.csv parse error: {detail}"),
+            Self::ListCsvHeaderMismatch => write!(
+                f,
+                "list.csv header does not match config (expected config factor order)"
+            ),
+            Self::ListCsvNoDataRows => write!(f, "list.csv contains a header but no data rows"),
+            Self::ListCsvColumnCount {
+                row,
+                expected,
+                found,
+            } => write!(
+                f,
+                "list.csv row {row} has {found} columns, expected {expected}"
+            ),
+            Self::ListCsvInvalidInteger { column, row } => write!(
+                f,
+                "list.csv row {row}: `{column}` is not a valid unsigned integer"
+            ),
+            Self::ChecksumsParse { line } => write!(
+                f,
+                "checksums.txt line {line}: expected `<hex>  <filename>` (GNU sha256sum text mode)"
+            ),
+            Self::ChecksumsInvalidDigest { line } => write!(
+                f,
+                "checksums.txt line {line}: digest must be 64 lowercase hex digits"
+            ),
+            Self::ChecksumsDuplicatePath { path } => {
+                write!(f, "checksums.txt lists `{path}` more than once")
+            }
+            Self::ManifestJsonParse => write!(f, "manifest.unblinded.json is not valid JSON"),
+            Self::BlindedManifestJsonParse => {
+                write!(f, "manifest.blinded.json is not valid JSON")
+            }
+            Self::InvalidSeedHexLength => {
+                write!(f, "invalid seed_hex length (expected 64 hex characters)")
+            }
+            Self::InvalidSeedHexEncoding => {
+                write!(f, "invalid seed_hex encoding (expected lowercase hex)")
+            }
         }
     }
 }
@@ -75,7 +162,19 @@ impl std::error::Error for PackageError {
         match self {
             Self::MissingStratumFactor { .. }
             | Self::InvalidGeneratedAt { .. }
-            | Self::PackageDirExists { .. } => None,
+            | Self::PackageDirExists { .. }
+            | Self::ListCsvParse { .. }
+            | Self::ListCsvHeaderMismatch
+            | Self::ListCsvNoDataRows
+            | Self::ListCsvColumnCount { .. }
+            | Self::ListCsvInvalidInteger { .. }
+            | Self::ChecksumsParse { .. }
+            | Self::ChecksumsInvalidDigest { .. }
+            | Self::ChecksumsDuplicatePath { .. }
+            | Self::ManifestJsonParse
+            | Self::BlindedManifestJsonParse
+            | Self::InvalidSeedHexLength
+            | Self::InvalidSeedHexEncoding => None,
             Self::Canonical(err) => Some(err),
             Self::Io(err) => Some(err),
         }

@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 
 use clinrand_core::{
-    generate, Arm, BlockScheme, ConfigError, DrawPurpose, GenerationError, Method, NumberingScheme,
-    StratificationFactor, StudyConfig, ALGO_VERSION,
+    generate, generate_with_options, Arm, BlockScheme, ConfigError, DrawPurpose, GenerationError,
+    Method, NumberingScheme, StratificationFactor, StudyConfig, ValidateOptions, ALGO_VERSION,
 };
 
 fn seed_a() -> [u8; 32] {
@@ -309,6 +309,77 @@ fn numbering_zero_pads_when_within_width() {
     };
     let list = generate(&cfg, seed_a()).expect("generate");
     assert_eq!(list.records[0].randomization_number, "00042");
+}
+
+fn level_names(n: usize) -> Vec<String> {
+    (1..=n).map(|i| format!("L{i:03}")).collect()
+}
+
+fn large_strata_cfg(level_count: usize) -> StudyConfig {
+    StudyConfig {
+        schema_version: "1.0".into(),
+        study_id: "TEST-201".into(),
+        protocol_version: "2.1".into(),
+        arms: arms_2_1(),
+        method: Method::StratifiedBlock {
+            block: BlockScheme::Variable { sizes: vec![6, 9] },
+        },
+        strata: vec![StratificationFactor {
+            name: "site".into(),
+            levels: level_names(level_count),
+        }],
+        list_length_per_stratum: 6,
+        numbering: NumberingScheme::Global {
+            start: 10001,
+            width: 5,
+        },
+    }
+}
+
+#[test]
+fn generate_rejects_more_than_200_stratum_combinations() {
+    let cfg = large_strata_cfg(201);
+    let err = generate(&cfg, seed_a()).expect_err("default generate must reject >200 strata");
+    match err {
+        GenerationError::InvalidConfig(errors) => {
+            assert!(
+                errors
+                    .iter()
+                    .any(|e| matches!(e, ConfigError::TooManyStrata { count: 201 })),
+                "expected TooManyStrata among {errors:?}"
+            );
+        }
+        other => panic!("expected InvalidConfig, got {other:?}"),
+    }
+}
+
+#[test]
+fn generate_with_options_accepts_large_strata_when_allowed() {
+    let cfg = large_strata_cfg(201);
+    let list = generate_with_options(
+        &cfg,
+        seed_a(),
+        &ValidateOptions {
+            allow_large_strata: true,
+        },
+    )
+    .expect("allow_large_strata should accept 201 combinations");
+    assert_eq!(list.records.len(), 201 * 6);
+}
+
+#[test]
+fn generate_matches_generate_with_options_default() {
+    let cfg = stratified_variable_cfg(12);
+    let default_list = generate(&cfg, seed_a()).expect("generate");
+    let options_list = generate_with_options(
+        &cfg,
+        seed_a(),
+        &ValidateOptions {
+            allow_large_strata: false,
+        },
+    )
+    .expect("generate_with_options with defaults");
+    assert_eq!(default_list, options_list);
 }
 
 #[test]

@@ -28,8 +28,9 @@ to **myIWRS**, a separate web application.
 
 ## Status
 
-Phase 0 scaffold. The engine, CLI commands, validation suite, and
-desktop UI are not implemented yet. See [`TODO.md`](TODO.md) and
+Phases 1–4 (engine and package writer) and Phase 5 (CLI) are
+implemented. The desktop application remains Phase 7. See
+[`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md), and
 [`docs/plans/clinrand-implementation-plan.md`](docs/plans/clinrand-implementation-plan.md).
 
 ## Install
@@ -43,7 +44,8 @@ Local builds require:
 just setup
 just test
 just lint
-just cli
+just cli -- version
+just cli -- generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
 ```
 
 Without `just`:
@@ -53,8 +55,10 @@ cargo fetch
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p clinrand-cli
+cargo run -p clinrand-cli -- version
 ```
+
+Command reference: [`docs/cli.md`](docs/cli.md).
 
 The desktop application is Phase 7. Until then there is no installer
 and no UI.

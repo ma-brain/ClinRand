@@ -63,19 +63,17 @@ struct RunState<'a> {
     ratio_sum: u32,
 }
 
-/// Generate a randomization list for `(cfg, seed)`.
+/// Generate a randomization list for `(cfg, seed)` with explicit validation options.
 ///
 /// Contract-bound: one [`Rng::from_seed`] per run, one shared [`StreamLog`],
 /// stream order per plan §2.4 / [`crate`] determinism docs. Must not change
 /// without an `ALGO_VERSION` bump. Pure: no I/O, clock, or environment.
-pub fn generate(cfg: &StudyConfig, seed: [u8; 32]) -> Result<GeneratedList, GenerationError> {
-    validate_config(
-        cfg,
-        &ValidateOptions {
-            allow_large_strata: false,
-        },
-    )
-    .map_err(GenerationError::InvalidConfig)?;
+pub fn generate_with_options(
+    cfg: &StudyConfig,
+    seed: [u8; 32],
+    options: &ValidateOptions,
+) -> Result<GeneratedList, GenerationError> {
+    validate_config(cfg, options).map_err(GenerationError::InvalidConfig)?;
 
     let mut run = RunState {
         cfg,
@@ -104,6 +102,20 @@ pub fn generate(cfg: &StudyConfig, seed: [u8; 32]) -> Result<GeneratedList, Gene
         records: run.records,
         stream: run.stream,
     })
+}
+
+/// Generate a randomization list for `(cfg, seed)`.
+///
+/// Uses [`ValidateOptions`] with `allow_large_strata: false`. See
+/// [`generate_with_options`] for override behaviour.
+pub fn generate(cfg: &StudyConfig, seed: [u8; 32]) -> Result<GeneratedList, GenerationError> {
+    generate_with_options(
+        cfg,
+        seed,
+        &ValidateOptions {
+            allow_large_strata: false,
+        },
+    )
 }
 
 impl RunState<'_> {

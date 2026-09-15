@@ -41,7 +41,9 @@ mod uniform;
 mod validate;
 
 pub use config::{Arm, BlockScheme, Method, NumberingScheme, StratificationFactor, StudyConfig};
-pub use generate::{generate, AllocationRecord, GeneratedList, GenerationError};
+pub use generate::{
+    generate, generate_with_options, AllocationRecord, GeneratedList, GenerationError,
+};
 pub use permute::permute;
 pub use properties::{check_properties, PropertyCheck, PropertyReport};
 pub use rng::Rng;
