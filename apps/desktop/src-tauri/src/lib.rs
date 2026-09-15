@@ -10,12 +10,23 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
 
+pub mod commands;
+mod seed;
+
 /// Tauri application entry point, invoked from `main`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::about::get_about,
+            commands::config::validate_config_json,
+            commands::config::preview_structure,
+            commands::generate::generate_package,
+            commands::verify::verify_package,
+            commands::validation::run_validation_report,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
