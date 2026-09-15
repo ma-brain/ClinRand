@@ -28,10 +28,13 @@ to **myIWRS**, a separate web application.
 
 ## Status
 
-Phases 1–6 (engine, package writer, CLI, and emitted `qc.R`) are
-implemented. The desktop application remains Phase 7. See
+Phases 1–7 are implemented: the engine, package writer, CLI, emitted
+`qc.R`, and the Tauri 2 + SvelteKit **desktop application** (all §11.1
+screens, capability lock-down, and [`docs/security-posture.md`](docs/security-posture.md)).
+Phase 8 (encryption at rest, tagged installers) is next. See
 [`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md),
-[`docs/qc-procedure.md`](docs/qc-procedure.md), and
+[`docs/qc-procedure.md`](docs/qc-procedure.md),
+[`apps/desktop/README.md`](apps/desktop/README.md), and
 [`docs/plans/clinrand-implementation-plan.md`](docs/plans/clinrand-implementation-plan.md).
 
 ## Install
@@ -61,8 +64,39 @@ cargo run -p clinrand-cli -- version
 
 Command reference: [`docs/cli.md`](docs/cli.md).
 
-The desktop application is Phase 7. Until then there is no installer
-and no UI.
+## Desktop application
+
+The desktop app lives in [`apps/desktop`](apps/desktop) (SvelteKit static
+SPA + Tauri 2). Allocation, hashing, and validation run in the same Rust
+engine crates through Tauri commands — TypeScript never reimplements them.
+The app has no network capability compiled in; see
+[`docs/security-posture.md`](docs/security-posture.md) for how to verify
+that from the capability files.
+
+Run the UI smoke flow (config → preview → generate → verify) on macOS,
+Windows, or Linux:
+
+```bash
+cd apps/desktop
+npm install
+npm run tauri dev
+```
+
+Prerequisites: Rust stable, Node 20+, and the platform WebView runtime.
+
+- **macOS** — WebKit ships with the OS; only Xcode command-line tools are
+  needed.
+- **Windows** — WebView2 runtime (bundled with recent Windows; otherwise
+  install the Evergreen runtime).
+- **Linux** — `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `librsvg2-dev`,
+  `libayatana-appindicator3-dev` (see `apps/desktop/README.md` for the full
+  apt list, mirrored by the `desktop` CI job).
+
+The `desktop` CI job builds the frontend, runs `cargo check` on the Tauri
+host, executes the command-flow integration test, and greps the capability
+files to confirm no `http`/`shell`/`process`/`updater` permission is
+granted. Full GUI end-to-end testing on all three OSes is manual and
+documented in [`apps/desktop/README.md`](apps/desktop/README.md).
 
 ## Repository layout
 
