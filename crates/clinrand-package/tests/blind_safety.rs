@@ -2,15 +2,19 @@
 //!
 //! For every randomization number in the list, no line of the blinded HTML
 //! may contain both that number and any arm code. The seed hex must not appear.
+//! Pairing uses delimiter-aware tokens so single-letter arms do not match
+//! substrings inside words like `PASS` / `Active`.
 
 use std::collections::BTreeMap;
 
 use clinrand_core::{
-    AllocationRecord, Arm, BlockScheme, DrawPurpose, GeneratedList, Method, NumberingScheme,
-    StreamDraw, StreamLog, StudyConfig,
+    generate, AllocationRecord, Arm, BlockScheme, GeneratedList, Method, NumberingScheme,
+    StratificationFactor, StudyConfig,
 };
 
-use clinrand_package::{render_generation_report, seed_hex, PackageMeta, ReportFileHashes};
+use clinrand_package::{
+    render_generation_report, render_unblinded_report, seed_hex, PackageMeta, ReportFileHashes,
+};
 
 fn arms_ap() -> Vec<Arm> {
     vec![
@@ -27,75 +31,27 @@ fn arms_ap() -> Vec<Arm> {
     ]
 }
 
+/// Stratified variable-block DEMO config with padded global numbering.
 fn demo_cfg() -> StudyConfig {
     StudyConfig {
         schema_version: "1.0".into(),
         study_id: "DEMO-505".into(),
         protocol_version: "1.0".into(),
         arms: arms_ap(),
-        method: Method::PermutedBlock {
-            block: BlockScheme::Fixed { size: 2 },
+        method: Method::StratifiedBlock {
+            block: BlockScheme::Variable { sizes: vec![4, 2] },
         },
-        strata: vec![],
-        list_length_per_stratum: 4,
+        // Config order deliberately not lexicographic on level labels:
+        // canonical order is 002 then 001 (last factor would vary fastest if
+        // more factors existed).
+        strata: vec![StratificationFactor {
+            name: "site".into(),
+            levels: vec!["002".into(), "001".into()],
+        }],
+        list_length_per_stratum: 6,
         numbering: NumberingScheme::Global {
             start: 10001,
             width: 5,
-        },
-    }
-}
-
-fn demo_list() -> GeneratedList {
-    GeneratedList {
-        records: vec![
-            AllocationRecord {
-                randomization_number: "10001".into(),
-                stratum: BTreeMap::new(),
-                block_id: 1,
-                block_size: 2,
-                position_in_block: 1,
-                arm_code: "A".into(),
-            },
-            AllocationRecord {
-                randomization_number: "10002".into(),
-                stratum: BTreeMap::new(),
-                block_id: 1,
-                block_size: 2,
-                position_in_block: 2,
-                arm_code: "P".into(),
-            },
-            AllocationRecord {
-                randomization_number: "10003".into(),
-                stratum: BTreeMap::new(),
-                block_id: 2,
-                block_size: 2,
-                position_in_block: 1,
-                arm_code: "P".into(),
-            },
-            AllocationRecord {
-                randomization_number: "10004".into(),
-                stratum: BTreeMap::new(),
-                block_id: 2,
-                block_size: 2,
-                position_in_block: 2,
-                arm_code: "A".into(),
-            },
-        ],
-        stream: StreamLog {
-            draws: vec![
-                StreamDraw {
-                    index: 0,
-                    bound: 2,
-                    value: 1,
-                    purpose: DrawPurpose::Permutation,
-                },
-                StreamDraw {
-                    index: 1,
-                    bound: 2,
-                    value: 0,
-                    purpose: DrawPurpose::Permutation,
-                },
-            ],
         },
     }
 }
@@ -126,24 +82,64 @@ fn demo_hashes() -> ReportFileHashes {
     }
 }
 
-#[test]
-fn blinded_report_never_pairs_randomization_number_with_arm_code() {
+fn demo_list() -> (StudyConfig, GeneratedList) {
     let cfg = demo_cfg();
-    let list = demo_list();
-    let html = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
+    let list = generate(&cfg, demo_seed()).expect("generate DEMO-505 list");
+    assert!(
+        list.records.len() >= 4,
+        "fixture must produce a real generate() list"
+    );
+    for rec in &list.records {
+        assert_eq!(
+            rec.randomization_number.len(),
+            5,
+            "padded numbers reduce false substring matches"
+        );
+    }
+    (cfg, list)
+}
 
-    let arm_codes: Vec<&str> = cfg.arms.iter().map(|a| a.code.as_str()).collect();
+/// True when `token` appears bounded by non-alphanumeric/underscore characters.
+fn contains_delimited_token(haystack: &str, token: &str) -> bool {
+    if token.is_empty() {
+        return false;
+    }
+    let bytes = haystack.as_bytes();
+    let token_bytes = token.as_bytes();
+    let mut from = 0;
+    while from + token_bytes.len() <= bytes.len() {
+        if let Some(rel) = haystack[from..].find(token) {
+            let i = from + rel;
+            let before_ok = i == 0 || !is_token_char(bytes[i - 1]);
+            let after = i + token_bytes.len();
+            let after_ok = after >= bytes.len() || !is_token_char(bytes[after]);
+            if before_ok && after_ok {
+                return true;
+            }
+            from = i + 1;
+        } else {
+            break;
+        }
+    }
+    false
+}
 
+fn is_token_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+fn line_pairs_rand_with_arm(line: &str, rand_num: &str, arm: &str) -> bool {
+    contains_delimited_token(line, rand_num) && contains_delimited_token(line, arm)
+}
+
+fn assert_no_rand_arm_pairing(html: &str, list: &GeneratedList, arm_codes: &[&str]) {
     for rec in &list.records {
         let rand_num = &rec.randomization_number;
         for (line_no, line) in html.lines().enumerate() {
-            if !line.contains(rand_num.as_str()) {
-                continue;
-            }
-            for arm in &arm_codes {
+            for arm in arm_codes {
                 assert!(
-                    !line.contains(arm),
-                    "blind-safety: line {} contains both randomization number {rand_num} and arm code {arm}:\n{line}",
+                    !line_pairs_rand_with_arm(line, rand_num, arm),
+                    "blind-safety: line {} pairs randomization number {rand_num} with arm {arm}:\n{line}",
                     line_no + 1
                 );
             }
@@ -151,10 +147,103 @@ fn blinded_report_never_pairs_randomization_number_with_arm_code() {
     }
 }
 
+fn count_rand_arm_pairings(html: &str, list: &GeneratedList, arm_codes: &[&str]) -> usize {
+    let mut n = 0;
+    for rec in &list.records {
+        let rand_num = &rec.randomization_number;
+        for line in html.lines() {
+            for arm in arm_codes {
+                if line_pairs_rand_with_arm(line, rand_num, arm) {
+                    n += 1;
+                }
+            }
+        }
+    }
+    n
+}
+
+#[test]
+fn blinded_report_never_pairs_randomization_number_with_arm_code() {
+    let (cfg, list) = demo_list();
+    let html = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
+    let arm_codes: Vec<&str> = cfg.arms.iter().map(|a| a.code.as_str()).collect();
+    assert_no_rand_arm_pairing(&html, &list, &arm_codes);
+}
+
+#[test]
+fn unblinded_report_negative_control_detects_rand_arm_pairing() {
+    let (cfg, list) = demo_list();
+    let html = render_unblinded_report(&cfg, &list, &meta(), &demo_hashes());
+    let arm_codes: Vec<&str> = cfg.arms.iter().map(|a| a.code.as_str()).collect();
+    let violations = count_rand_arm_pairings(&html, &list, &arm_codes);
+    assert!(
+        violations > 0,
+        "negative control: unblinded HTML must contain at least one rand#↔arm pairing line so the detector has teeth"
+    );
+}
+
+#[test]
+fn blinded_report_omits_property_check_details() {
+    let (cfg, list) = demo_list();
+    let blinded = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
+    let unblinded = render_unblinded_report(&cfg, &list, &meta(), &demo_hashes());
+
+    assert!(
+        !blinded.contains("detail:"),
+        "blinded report must not emit PropertyCheck.detail text"
+    );
+    assert!(
+        unblinded.contains("detail:"),
+        "unblinded report must still include property details"
+    );
+    assert!(blinded.contains("P01"));
+    assert!(
+        blinded.contains("PASS") || blinded.contains("FAIL") || blinded.contains("informational")
+    );
+}
+
+#[test]
+fn per_stratum_sections_follow_canonical_config_order_including_zeros() {
+    let cfg = demo_cfg();
+    // Partial list: only site=002 present → site=001 must still appear as count=0,
+    // and order must be config order (002 before 001), not BTreeMap label sort.
+    let list = GeneratedList {
+        records: vec![AllocationRecord {
+            randomization_number: "10001".into(),
+            stratum: BTreeMap::from([("site".into(), "002".into())]),
+            block_id: 1,
+            block_size: 2,
+            position_in_block: 1,
+            arm_code: "A".into(),
+        }],
+        stream: Default::default(),
+    };
+    let html = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
+
+    let pos_002 = html.find("stratum=site=002 count=").expect("site=002 row");
+    let pos_001 = html
+        .find("stratum=site=001 count=0")
+        .expect("site=001 zero-count row");
+    assert!(
+        pos_002 < pos_001,
+        "canonical config order is 002 then 001; got 002@{pos_002} 001@{pos_001}"
+    );
+
+    let block_002 = html
+        .find("stratum=site=002 blocks:")
+        .expect("site=002 blocks");
+    let block_001 = html
+        .find("stratum=site=001 blocks: (none)")
+        .expect("site=001 empty blocks");
+    assert!(
+        block_002 < block_001,
+        "block structure must also use canonical stratum order"
+    );
+}
+
 #[test]
 fn blinded_report_does_not_contain_seed_hex() {
-    let cfg = demo_cfg();
-    let list = demo_list();
+    let (cfg, list) = demo_list();
     let seed = demo_seed();
     let seed_hex_str = seed_hex(&seed);
     let html = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
@@ -171,8 +260,7 @@ fn blinded_report_does_not_contain_seed_hex() {
 
 #[test]
 fn blinded_report_includes_required_sections() {
-    let cfg = demo_cfg();
-    let list = demo_list();
+    let (cfg, list) = demo_list();
     let hashes = demo_hashes();
     let html = render_generation_report(&cfg, &list, &meta(), &hashes);
 

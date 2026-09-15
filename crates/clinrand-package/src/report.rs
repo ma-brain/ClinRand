@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use clinrand_core::{
-    check_properties, AllocationRecord, BlockScheme, GeneratedList, Method, NumberingScheme,
-    StudyConfig, ALGO_VERSION,
+    check_properties, stratum_combinations, AllocationRecord, BlockScheme, GeneratedList, Method,
+    NumberingScheme, StudyConfig, ALGO_VERSION,
 };
 
 use crate::manifest::PackageMeta;
@@ -39,11 +39,12 @@ pub struct ReportFileHashes {
 /// Render `generation-report.html` (blinded).
 ///
 /// Includes study metadata, full config (arms+ratios, not assignments),
-/// per-stratum counts and block structure, hashes, engine/algo versions,
-/// [`check_properties`] results, and truncation / numbering warnings.
+/// per-stratum counts and block structure (canonical stratum order, including
+/// zero-count strata), hashes, engine/algo versions, [`check_properties`]
+/// id/status only (no detail text), and truncation / numbering warnings.
 ///
-/// Does **not** include the seed, any randomization-number↔arm pairing, or
-/// per-block arm composition.
+/// Does **not** include the seed, any randomization-number↔arm pairing,
+/// per-block arm composition, or raw property-check detail strings.
 pub fn render_generation_report(
     cfg: &StudyConfig,
     list: &GeneratedList,
@@ -62,7 +63,7 @@ pub fn render_generation_report(
     push_numbering_warning(&mut body, cfg);
     push_hashes_section(&mut body, hashes);
     push_versions_section(&mut body);
-    push_properties_section(&mut body, &properties);
+    push_properties_section(&mut body, &properties, /* include_details */ false);
     push_footer(&mut body);
 
     wrap_html("ClinRand generation report (blinded)", &body)
@@ -90,7 +91,7 @@ pub fn render_unblinded_report(
     push_numbering_warning(&mut body, cfg);
     push_hashes_section(&mut body, hashes);
     push_versions_section(&mut body);
-    push_properties_section(&mut body, &properties);
+    push_properties_section(&mut body, &properties, /* include_details */ true);
     push_allocation_table(&mut body, cfg, list);
     push_footer(&mut body);
 
@@ -234,18 +235,27 @@ fn push_counts_section(out: &mut String, cfg: &StudyConfig, list: &GeneratedList
 
     let _ = writeln!(out, "<h3>Per stratum</h3>");
     let _ = writeln!(out, "<ul>");
-    let counts = per_stratum_counts(cfg, list);
-    if counts.is_empty() {
+    if cfg.strata.is_empty() {
         let _ = writeln!(out, "<li>(unstratified) count={}</li>", list.records.len());
     } else {
-        for (label, count) in counts {
-            // Intentionally no randomization numbers and no arm codes here.
-            let _ = writeln!(
-                out,
-                "<li>stratum={} count={}</li>",
-                escape_html(&label),
-                count
-            );
+        match stratum_combinations(&cfg.strata) {
+            Ok(combos) => {
+                for combo in &combos {
+                    let label = stratum_label(cfg, combo);
+                    let count = list.records.iter().filter(|r| &r.stratum == combo).count();
+                    // Intentionally no randomization numbers and no arm codes here.
+                    // Canonical config order (plan §5.4), including count=0 strata.
+                    let _ = writeln!(
+                        out,
+                        "<li>stratum={} count={}</li>",
+                        escape_html(&label),
+                        count
+                    );
+                }
+            }
+            Err(_) => {
+                let _ = writeln!(out, "<li>stratum combination count overflowed</li>");
+            }
         }
     }
     let _ = writeln!(out, "</ul>");
@@ -256,21 +266,39 @@ fn push_block_structure_section(out: &mut String, cfg: &StudyConfig, list: &Gene
     let _ = writeln!(out, "<p>Counts and sizes only — no arm composition.</p>");
     let _ = writeln!(out, "<ul>");
 
-    let structure = block_structure(cfg, list);
-    if structure.is_empty() {
-        let _ = writeln!(out, "<li>no blocks</li>");
-    } else {
-        for (label, size_counts) in structure {
-            let mut parts = Vec::new();
-            for (size, n_blocks) in size_counts {
-                parts.push(format!("{n_blocks}×size {size}"));
-            }
+    if cfg.strata.is_empty() {
+        let size_counts = block_size_counts_for_stratum(list, &BTreeMap::new());
+        if size_counts.is_empty() {
+            let _ = writeln!(out, "<li>no blocks</li>");
+        } else {
             let _ = writeln!(
                 out,
-                "<li>stratum={} blocks: {}</li>",
-                escape_html(&label),
-                parts.join(", ")
+                "<li>stratum=(unstratified) blocks: {}</li>",
+                format_block_size_counts(&size_counts)
             );
+        }
+    } else {
+        match stratum_combinations(&cfg.strata) {
+            Ok(combos) => {
+                for combo in &combos {
+                    let label = stratum_label(cfg, combo);
+                    let size_counts = block_size_counts_for_stratum(list, combo);
+                    let blocks = if size_counts.is_empty() {
+                        "(none)".to_owned()
+                    } else {
+                        format_block_size_counts(&size_counts)
+                    };
+                    let _ = writeln!(
+                        out,
+                        "<li>stratum={} blocks: {}</li>",
+                        escape_html(&label),
+                        blocks
+                    );
+                }
+            }
+            Err(_) => {
+                let _ = writeln!(out, "<li>stratum combination count overflowed</li>");
+            }
         }
     }
     let _ = writeln!(out, "</ul>");
@@ -356,7 +384,11 @@ fn push_versions_section(out: &mut String) {
     let _ = writeln!(out, "</ul>");
 }
 
-fn push_properties_section(out: &mut String, report: &clinrand_core::PropertyReport) {
+fn push_properties_section(
+    out: &mut String,
+    report: &clinrand_core::PropertyReport,
+    include_details: bool,
+) {
     let _ = writeln!(out, "<h2>Property checks</h2>");
     let overall = if report.all_required_passed() {
         "all required checks passed"
@@ -377,16 +409,18 @@ fn push_properties_section(out: &mut String, report: &clinrand_core::PropertyRep
         } else {
             "FAIL"
         };
-        // Detail may mention arm codes (P03/P09/P10) or randomization numbers
-        // (P04 fail). Keep id/status on one line and detail on the next so a
-        // passing report never pairs a rand# with an arm on the same line.
+        // Blinded report: id + pass/fail (+ informational) only. Full detail
+        // text can name a randomization number and an arm (P03/P04/P09/P10)
+        // and belongs only in the unblinded report.
         let _ = writeln!(
             out,
             "<li>{} {}</li>",
             escape_html(check.id),
             escape_html(status)
         );
-        let _ = writeln!(out, "<li>detail: {}</li>", escape_html(&check.detail));
+        if include_details {
+            let _ = writeln!(out, "<li>detail: {}</li>", escape_html(&check.detail));
+        }
     }
     let _ = writeln!(out, "</ul>");
 }
@@ -456,40 +490,30 @@ fn stratum_label(cfg: &StudyConfig, stratum: &BTreeMap<String, String>) -> Strin
     parts.join(", ")
 }
 
-fn per_stratum_counts(cfg: &StudyConfig, list: &GeneratedList) -> Vec<(String, usize)> {
-    if cfg.strata.is_empty() {
-        return Vec::new();
-    }
-    let mut map: BTreeMap<String, usize> = BTreeMap::new();
+/// Map of block_size → number of distinct block_ids with that size, for one stratum.
+fn block_size_counts_for_stratum(
+    list: &GeneratedList,
+    stratum: &BTreeMap<String, String>,
+) -> BTreeMap<u32, u32> {
+    let mut blocks: BTreeMap<u32, u32> = BTreeMap::new();
     for rec in &list.records {
-        let label = stratum_label(cfg, &rec.stratum);
-        *map.entry(label).or_insert(0) += 1;
+        if &rec.stratum == stratum {
+            blocks.entry(rec.block_id).or_insert(rec.block_size);
+        }
     }
-    map.into_iter().collect()
+    let mut size_counts: BTreeMap<u32, u32> = BTreeMap::new();
+    for size in blocks.values() {
+        *size_counts.entry(*size).or_insert(0) += 1;
+    }
+    size_counts
 }
 
-/// Per stratum: map of block_size → number of distinct block_ids with that size.
-fn block_structure(cfg: &StudyConfig, list: &GeneratedList) -> Vec<(String, BTreeMap<u32, u32>)> {
-    // stratum label → (block_id → block_size)
-    let mut by_stratum: BTreeMap<String, BTreeMap<u32, u32>> = BTreeMap::new();
-    for rec in &list.records {
-        let label = stratum_label(cfg, &rec.stratum);
-        by_stratum
-            .entry(label)
-            .or_default()
-            .entry(rec.block_id)
-            .or_insert(rec.block_size);
+fn format_block_size_counts(size_counts: &BTreeMap<u32, u32>) -> String {
+    let mut parts = Vec::new();
+    for (size, n_blocks) in size_counts {
+        parts.push(format!("{n_blocks}×size {size}"));
     }
-
-    let mut out = Vec::new();
-    for (label, blocks) in by_stratum {
-        let mut size_counts: BTreeMap<u32, u32> = BTreeMap::new();
-        for size in blocks.values() {
-            *size_counts.entry(*size).or_insert(0) += 1;
-        }
-        out.push((label, size_counts));
-    }
-    out
+    parts.join(", ")
 }
 
 fn truncation_warnings(cfg: &StudyConfig, list: &GeneratedList) -> Vec<String> {
