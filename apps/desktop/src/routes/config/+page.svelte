@@ -8,6 +8,7 @@
     type MethodName,
     type BlockKind,
     type NumberingKind,
+    type WorkingConfig,
   } from "$lib/stores/config";
   import { examples } from "$lib/examples";
   import type { ConfigIssue, ValidationOutcome } from "$lib/types/config";
@@ -17,40 +18,177 @@
   let validating = $state(false);
   let validateError = $state<string | null>(null);
 
-  // Map Rust error codes onto UI sections; unmapped codes fall through to the
-  // general list. Codes come from apps/desktop/src-tauri/src/commands/config.rs.
-  const SECTION_BY_CODE: Record<string, string> = {
-    too_few_arms: "arms",
-    duplicate_arm_code: "arms",
-    invalid_arm_code: "arms",
-    zero_ratio: "arms",
-    ratio_sum_overflow: "arms",
-    block_size_zero: "block",
-    fixed_block_size_not_multiple: "block",
-    variable_block_size_not_multiple: "block",
-    empty_block_sizes: "block",
-    duplicate_block_size: "block",
-    block_size_too_large: "block",
-    duplicate_factor_name: "strata",
-    duplicate_level: "strata",
-    empty_factor_levels: "strata",
-    invalid_factor_name: "strata",
-    invalid_level_name: "strata",
-    too_many_strata: "strata",
-    stratum_combination_overflow: "strata",
-    stratified_block_empty_strata: "strata",
-    permuted_block_non_empty_strata: "strata",
-    per_stratum_range_too_small: "numbering",
-  };
-
   const errors = $derived<ConfigIssue[]>(outcome?.errors ?? []);
   const warnings = $derived<string[]>(outcome?.warnings ?? []);
 
-  function errorsFor(section: string): ConfigIssue[] {
-    return errors.filter((e) => (SECTION_BY_CODE[e.code] ?? "general") === section);
+  /**
+   * Errors resolved to specific controls. Value-bearing backend codes are
+   * matched against the current store rows (via the value carried in the
+   * message); anything that cannot be pinned to a control falls back to a
+   * section summary or the general list. Codes come from
+   * apps/desktop/src-tauri/src/commands/config.rs.
+   */
+  interface MappedErrors {
+    arm: Map<number, ConfigIssue[]>;
+    blockSize: Map<number, ConfigIssue[]>;
+    factor: Map<number, ConfigIssue[]>;
+    level: Map<string, ConfigIssue[]>;
+    fixedBlock: ConfigIssue[];
+    numberingBlockSize: ConfigIssue[];
+    sectionArms: ConfigIssue[];
+    sectionBlock: ConfigIssue[];
+    sectionStrata: ConfigIssue[];
+    general: ConfigIssue[];
   }
 
-  const generalErrors = $derived(errors.filter((e) => !(e.code in SECTION_BY_CODE)));
+  function pushMap<K>(map: Map<K, ConfigIssue[]>, key: K, issue: ConfigIssue): void {
+    const existing = map.get(key);
+    if (existing) {
+      existing.push(issue);
+    } else {
+      map.set(key, [issue]);
+    }
+  }
+
+  function mapErrors(issues: ConfigIssue[], cfg: WorkingConfig): MappedErrors {
+    const arm = new Map<number, ConfigIssue[]>();
+    const blockSize = new Map<number, ConfigIssue[]>();
+    const factor = new Map<number, ConfigIssue[]>();
+    const level = new Map<string, ConfigIssue[]>();
+    const fixedBlock: ConfigIssue[] = [];
+    const numberingBlockSize: ConfigIssue[] = [];
+    const sectionArms: ConfigIssue[] = [];
+    const sectionBlock: ConfigIssue[] = [];
+    const sectionStrata: ConfigIssue[] = [];
+    const general: ConfigIssue[] = [];
+
+    const armsByCode = (code: string): number[] =>
+      cfg.arms.flatMap((a, i) => (a.code === code ? [i] : []));
+    const blockSizesEqual = (n: number): number[] =>
+      cfg.block_sizes.flatMap((s, i) => (s === n ? [i] : []));
+    const factorsByName = (name: string): number[] =>
+      cfg.strata.flatMap((f, i) => (f.name === name ? [i] : []));
+
+    const attachArm = (issue: ConfigIssue, code: string | undefined): void => {
+      const idx = code !== undefined ? armsByCode(code) : [];
+      if (idx.length) idx.forEach((i) => pushMap(arm, i, issue));
+      else sectionArms.push(issue);
+    };
+    const attachSize = (issue: ConfigIssue, token: string | undefined): void => {
+      const idx = token !== undefined ? blockSizesEqual(Number(token)) : [];
+      if (idx.length) idx.forEach((i) => pushMap(blockSize, i, issue));
+      else sectionBlock.push(issue);
+    };
+    const attachFactor = (issue: ConfigIssue, name: string | undefined): void => {
+      const idx = name !== undefined ? factorsByName(name) : [];
+      if (idx.length) idx.forEach((i) => pushMap(factor, i, issue));
+      else sectionStrata.push(issue);
+    };
+    const attachLevel = (
+      issue: ConfigIssue,
+      match: RegExpMatchArray | null,
+    ): void => {
+      if (!match) {
+        sectionStrata.push(issue);
+        return;
+      }
+      const lvl = match[1];
+      const fname = match[2];
+      let matched = false;
+      cfg.strata.forEach((f, fi) => {
+        if (f.name !== fname) return;
+        f.levels.forEach((l, li) => {
+          if (l === lvl) {
+            pushMap(level, `${fi}:${li}`, issue);
+            matched = true;
+          }
+        });
+      });
+      if (!matched) sectionStrata.push(issue);
+    };
+
+    for (const issue of issues) {
+      const m = issue.message;
+      switch (issue.code) {
+        case "too_few_arms":
+        case "ratio_sum_overflow":
+          sectionArms.push(issue);
+          break;
+        case "duplicate_arm_code":
+          attachArm(issue, m.match(/^duplicate arm code (.*)$/)?.[1]);
+          break;
+        case "invalid_arm_code":
+          attachArm(issue, m.match(/^arm code (.*) is invalid$/)?.[1]);
+          break;
+        case "zero_ratio":
+          attachArm(issue, m.match(/^arm (.*) has ratio 0$/)?.[1]);
+          break;
+        case "block_size_zero":
+        case "empty_block_sizes":
+          sectionBlock.push(issue);
+          break;
+        case "fixed_block_size_not_multiple":
+          fixedBlock.push(issue);
+          break;
+        case "variable_block_size_not_multiple":
+          attachSize(issue, m.match(/^variable block size (\d+) /)?.[1]);
+          break;
+        case "duplicate_block_size":
+          attachSize(issue, m.match(/^duplicate variable block size (\d+)$/)?.[1]);
+          break;
+        case "block_size_too_large":
+          attachSize(issue, m.match(/^variable block size (\d+) exceeds 24$/)?.[1]);
+          break;
+        case "duplicate_factor_name":
+          attachFactor(issue, m.match(/^duplicate stratum factor name (.*)$/)?.[1]);
+          break;
+        case "empty_factor_levels":
+          attachFactor(issue, m.match(/^factor (.*) has no levels$/)?.[1]);
+          break;
+        case "invalid_factor_name":
+          attachFactor(issue, m.match(/^factor name (.*) is invalid$/)?.[1]);
+          break;
+        case "duplicate_level":
+          attachLevel(issue, m.match(/^duplicate level (.+?) in factor (.+)$/));
+          break;
+        case "invalid_level_name":
+          attachLevel(issue, m.match(/^level (.+?) of factor (.+)$/));
+          break;
+        case "too_many_strata":
+        case "stratum_combination_overflow":
+        case "stratified_block_empty_strata":
+        case "permuted_block_non_empty_strata":
+          sectionStrata.push(issue);
+          break;
+        case "per_stratum_range_too_small":
+          numberingBlockSize.push(issue);
+          break;
+        default:
+          general.push(issue);
+      }
+    }
+
+    return {
+      arm,
+      blockSize,
+      factor,
+      level,
+      fixedBlock,
+      numberingBlockSize,
+      sectionArms,
+      sectionBlock,
+      sectionStrata,
+      general,
+    };
+  }
+
+  const mapped = $derived(mapErrors(errors, $config));
+
+  const armErr = (i: number): ConfigIssue[] => mapped.arm.get(i) ?? [];
+  const blockSizeErr = (i: number): ConfigIssue[] => mapped.blockSize.get(i) ?? [];
+  const factorErr = (i: number): ConfigIssue[] => mapped.factor.get(i) ?? [];
+  const levelErr = (fi: number, li: number): ConfigIssue[] =>
+    mapped.level.get(`${fi}:${li}`) ?? [];
 
   // The disclosure warning is shown whenever per_stratum_range is selected so
   // it is always visible (plan §5.6), even while other errors suppress the
@@ -118,32 +256,46 @@
     }
   }
 
-  async function runValidation(json: string, allow: boolean): Promise<void> {
-    validating = true;
-    validateError = null;
+  // Monotonic generation guard: only the newest request may touch shared state,
+  // so a slow older request can never overwrite a newer result or flip the
+  // `validating` flag off while a newer request is still in flight.
+  let generation = 0;
+
+  async function runValidation(
+    json: string,
+    allow: boolean,
+    gen: number,
+  ): Promise<void> {
     try {
-      outcome = await invoke<ValidationOutcome>("validate_config_json", {
+      const result = await invoke<ValidationOutcome>("validate_config_json", {
         json,
         allowLargeStrata: allow,
       });
+      if (gen !== generation) return;
+      outcome = result;
+      validateError = null;
     } catch (err) {
+      if (gen !== generation) return;
       outcome = null;
       validateError =
         err instanceof Error
           ? err.message
           : "The validation command could not be reached.";
     } finally {
-      validating = false;
+      if (gen === generation) validating = false;
     }
   }
 
-  // Debounced live validation: recompute wire JSON on any change, wait ~300ms,
-  // then call the Rust command. Cleanup cancels a pending call on re-run.
+  // Debounced live validation. Every edit bumps the generation and immediately
+  // marks the result as checking (so the status never shows a stale verdict),
+  // then waits ~300ms before calling the Rust command.
   $effect(() => {
     const json = toWireJson($config);
     const allow = allowLargeStrata;
+    const gen = ++generation;
+    validating = true;
     const timer = setTimeout(() => {
-      void runValidation(json, allow);
+      void runValidation(json, allow, gen);
     }, 300);
     return () => clearTimeout(timer);
   });
@@ -163,15 +315,15 @@
 
   <div
     class="status"
-    class:status-valid={outcome?.ok}
-    class:status-invalid={outcome && !outcome.ok}
+    class:status-valid={!validating && outcome?.ok}
+    class:status-invalid={!validating && outcome && !outcome.ok}
     role="status"
     aria-live="polite"
   >
     {#if validateError}
       Validation unavailable
-    {:else if validating && !outcome}
-      Validating…
+    {:else if validating}
+      Checking…
     {:else if outcome?.ok}
       Valid{warnings.length ? ` · ${warnings.length} warning(s)` : ""}
     {:else if outcome}
@@ -226,39 +378,55 @@
   <h2 id="arms-heading">Arms</h2>
   <div class="rows">
     {#each $config.arms as _arm, i (i)}
-      <div class="row arm-row">
-        <label class="grow">
-          <span>Code</span>
-          <input type="text" bind:value={$config.arms[i].code} />
-        </label>
-        <label class="grow2">
-          <span>Label</span>
-          <input type="text" bind:value={$config.arms[i].label} />
-        </label>
-        <label class="narrow">
-          <span>Ratio</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={$config.arms[i].ratio}
-            oninput={(e) => ($config.arms[i].ratio = intFromEvent(e))}
-          />
-        </label>
-        <button
-          type="button"
-          class="remove"
-          onclick={() => removeArm(i)}
-          disabled={$config.arms.length <= 2}
-          aria-label="Remove arm"
-        >
-          Remove
-        </button>
+      <div class="field-group">
+        <div class="row arm-row">
+          <label class="grow">
+            <span>Code</span>
+            <input
+              type="text"
+              bind:value={$config.arms[i].code}
+              aria-invalid={armErr(i).length > 0}
+              aria-describedby={armErr(i).length ? `arm-err-${i}` : undefined}
+            />
+          </label>
+          <label class="grow2">
+            <span>Label</span>
+            <input type="text" bind:value={$config.arms[i].label} />
+          </label>
+          <label class="narrow">
+            <span>Ratio</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={$config.arms[i].ratio}
+              oninput={(e) => ($config.arms[i].ratio = intFromEvent(e))}
+              aria-invalid={armErr(i).length > 0}
+              aria-describedby={armErr(i).length ? `arm-err-${i}` : undefined}
+            />
+          </label>
+          <button
+            type="button"
+            class="remove"
+            onclick={() => removeArm(i)}
+            disabled={$config.arms.length <= 2}
+            aria-label="Remove arm"
+          >
+            Remove
+          </button>
+        </div>
+        {#if armErr(i).length}
+          <div id={`arm-err-${i}`} class="field-errors">
+            {#each armErr(i) as err (err.code + err.message)}
+              <p class="inline-error">{err.message}</p>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/each}
   </div>
   <button type="button" class="ghost" onclick={addArm}>Add arm</button>
-  {#each errorsFor("arms") as err (err.code + err.message)}
+  {#each mapped.sectionArms as err (err.code + err.message)}
     <p class="inline-error">{err.message}</p>
   {/each}
 </section>
@@ -308,32 +476,54 @@
             step="1"
             value={$config.block_size}
             oninput={(e) => ($config.block_size = intFromEvent(e))}
+            aria-invalid={mapped.fixedBlock.length > 0}
+            aria-describedby={mapped.fixedBlock.length ? "fixed-block-err" : undefined}
           />
         </label>
       </div>
+      {#if mapped.fixedBlock.length}
+        <div id="fixed-block-err" class="field-errors">
+          {#each mapped.fixedBlock as err (err.code + err.message)}
+            <p class="inline-error">{err.message}</p>
+          {/each}
+        </div>
+      {/if}
     {:else}
       <div class="rows">
         {#each $config.block_sizes as _size, i (i)}
-          <div class="row">
-            <label class="narrow">
-              <span>Size</span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={$config.block_sizes[i]}
-                oninput={(e) => ($config.block_sizes[i] = intFromEvent(e))}
-              />
-            </label>
-            <button
-              type="button"
-              class="remove"
-              onclick={() => removeBlockSize(i)}
-              disabled={$config.block_sizes.length <= 1}
-              aria-label="Remove block size"
-            >
-              Remove
-            </button>
+          <div class="field-group">
+            <div class="row">
+              <label class="narrow">
+                <span>Size</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={$config.block_sizes[i]}
+                  oninput={(e) => ($config.block_sizes[i] = intFromEvent(e))}
+                  aria-invalid={blockSizeErr(i).length > 0}
+                  aria-describedby={blockSizeErr(i).length
+                    ? `block-size-err-${i}`
+                    : undefined}
+                />
+              </label>
+              <button
+                type="button"
+                class="remove"
+                onclick={() => removeBlockSize(i)}
+                disabled={$config.block_sizes.length <= 1}
+                aria-label="Remove block size"
+              >
+                Remove
+              </button>
+            </div>
+            {#if blockSizeErr(i).length}
+              <div id={`block-size-err-${i}`} class="field-errors">
+                {#each blockSizeErr(i) as err (err.code + err.message)}
+                  <p class="inline-error">{err.message}</p>
+                {/each}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -343,7 +533,7 @@
     {/if}
   {/if}
 
-  {#each errorsFor("block") as err (err.code + err.message)}
+  {#each mapped.sectionBlock as err (err.code + err.message)}
     <p class="inline-error">{err.message}</p>
   {/each}
 </section>
@@ -359,39 +549,68 @@
 
     {#each $config.strata as _factor, fi (fi)}
       <div class="factor">
-        <div class="row">
-          <label class="grow">
-            <span>Factor name</span>
-            <input type="text" bind:value={$config.strata[fi].name} />
-          </label>
-          <button
-            type="button"
-            class="remove"
-            onclick={() => removeFactor(fi)}
-            aria-label="Remove factor"
-          >
-            Remove factor
-          </button>
+        <div class="field-group">
+          <div class="row">
+            <label class="grow">
+              <span>Factor name</span>
+              <input
+                type="text"
+                bind:value={$config.strata[fi].name}
+                aria-invalid={factorErr(fi).length > 0}
+                aria-describedby={factorErr(fi).length
+                  ? `factor-err-${fi}`
+                  : undefined}
+              />
+            </label>
+            <button
+              type="button"
+              class="remove"
+              onclick={() => removeFactor(fi)}
+              aria-label="Remove factor"
+            >
+              Remove factor
+            </button>
+          </div>
+          {#if factorErr(fi).length}
+            <div id={`factor-err-${fi}`} class="field-errors">
+              {#each factorErr(fi) as err (err.code + err.message)}
+                <p class="inline-error">{err.message}</p>
+              {/each}
+            </div>
+          {/if}
         </div>
         <div class="levels">
           {#each $config.strata[fi].levels as _level, li (li)}
-            <div class="row">
-              <label class="grow">
-                <span>Level</span>
-                <input
-                  type="text"
-                  bind:value={$config.strata[fi].levels[li]}
-                />
-              </label>
-              <button
-                type="button"
-                class="remove"
-                onclick={() => removeLevel(fi, li)}
-                disabled={$config.strata[fi].levels.length <= 1}
-                aria-label="Remove level"
-              >
-                Remove
-              </button>
+            <div class="field-group">
+              <div class="row">
+                <label class="grow">
+                  <span>Level</span>
+                  <input
+                    type="text"
+                    bind:value={$config.strata[fi].levels[li]}
+                    aria-invalid={levelErr(fi, li).length > 0}
+                    aria-describedby={levelErr(fi, li).length
+                      ? `level-err-${fi}-${li}`
+                      : undefined}
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="remove"
+                  onclick={() => removeLevel(fi, li)}
+                  disabled={$config.strata[fi].levels.length <= 1}
+                  aria-label="Remove level"
+                >
+                  Remove
+                </button>
+              </div>
+              {#if levelErr(fi, li).length}
+                <div id={`level-err-${fi}-${li}`} class="field-errors">
+                  {#each levelErr(fi, li) as err (err.code + err.message)}
+                    <p class="inline-error">{err.message}</p>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/each}
           <button type="button" class="ghost" onclick={() => addLevel(fi)}>
@@ -402,19 +621,10 @@
     {/each}
     <button type="button" class="ghost" onclick={addFactor}>Add factor</button>
 
-    {#each errorsFor("strata") as err (err.code + err.message)}
+    {#each mapped.sectionStrata as err (err.code + err.message)}
       <p class="inline-error">{err.message}</p>
     {/each}
   </section>
-{:else}
-  <!-- Errors that concern strata can still surface for non-stratified methods -->
-  {#if errorsFor("strata").length}
-    <section class="card">
-      {#each errorsFor("strata") as err (err.code + err.message)}
-        <p class="inline-error">{err.message}</p>
-      {/each}
-    </section>
-  {/if}
 {/if}
 
 <!-- Numbering -->
@@ -462,10 +672,22 @@
           step="1"
           value={$config.numbering_block_size}
           oninput={(e) => ($config.numbering_block_size = intFromEvent(e))}
+          aria-invalid={mapped.numberingBlockSize.length > 0}
+          aria-describedby={mapped.numberingBlockSize.length
+            ? "numbering-block-size-err"
+            : undefined}
         />
       </label>
     {/if}
   </div>
+
+  {#if mapped.numberingBlockSize.length}
+    <div id="numbering-block-size-err" class="field-errors">
+      {#each mapped.numberingBlockSize as err (err.code + err.message)}
+        <p class="inline-error">{err.message}</p>
+      {/each}
+    </div>
+  {/if}
 
   {#if $config.numbering_kind === "per_stratum_range"}
     <div class="panel disclosure" role="note">
@@ -473,17 +695,13 @@
       <p class="panel-body">{disclosureText}</p>
     </div>
   {/if}
-
-  {#each errorsFor("numbering") as err (err.code + err.message)}
-    <p class="inline-error">{err.message}</p>
-  {/each}
 </section>
 
 <!-- General errors + other warnings -->
-{#if generalErrors.length}
+{#if mapped.general.length}
   <section class="card">
     <h2>Other errors</h2>
-    {#each generalErrors as err (err.code + err.message)}
+    {#each mapped.general as err (err.code + err.message)}
       <p class="inline-error">{err.message}</p>
     {/each}
   </section>
@@ -580,6 +798,12 @@
     margin-bottom: 0.75rem;
   }
 
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   .row {
     display: flex;
     align-items: flex-end;
@@ -630,6 +854,11 @@
   select:focus {
     outline: none;
     border-color: var(--accent);
+  }
+
+  input[aria-invalid="true"] {
+    border-color: var(--error-border);
+    background-color: var(--error-bg);
   }
 
   .factor {
@@ -686,14 +915,24 @@
     color: var(--error-text);
   }
 
+  .field-errors {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   .inline-error {
-    margin: 0.625rem 0 0;
-    padding: 0.5rem 0.75rem;
+    margin: 0;
+    padding: 0.4rem 0.65rem;
     border: 1px solid var(--error-border);
     border-radius: 4px;
     background-color: var(--error-bg);
     color: var(--error-text);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  section > .inline-error {
+    margin-top: 0.625rem;
   }
 
   .inline-warning {
