@@ -13,6 +13,7 @@ mod list;
 mod manifest;
 mod qc;
 mod read;
+mod regression;
 mod report;
 mod stream;
 mod verify;
@@ -33,6 +34,9 @@ pub use qc::render_qc_r;
 pub use read::{
     parse_blinded_manifest, parse_checksums_txt, parse_list_csv, parse_unblinded_manifest,
     UnblindedManifest,
+};
+pub use regression::{
+    check_regression_case, load_regression_cases, RegressionCase, RegressionOutcome,
 };
 pub use report::{render_generation_report, render_unblinded_report, ReportFileHashes};
 pub use stream::render_stream_csv;

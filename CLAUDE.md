@@ -57,8 +57,8 @@ just build          # cargo build --workspace --release
 ### CLI only
 
 ```bash
-just cli -- version                                      # print version
-just cli -- generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
+just cli version                                      # print version
+just cli generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
 ```
 
 ### Desktop (Tauri + SvelteKit)
@@ -158,4 +158,4 @@ When a test fails, assume the code is wrong first. Do not add tolerances, retrie
 
 Confirm which phase you are in by checking `docs/plans/clinrand-implementation-plan.md` §12 ("Done when" criteria) and `TODO.md`. Do not start a phase until the previous one's criteria are met.
 
-Current status (as of Sept 2026): Phases 1–8 complete (engine, package, CLI, desktop, `qc.R`, security posture, encryption at rest, tagged release installers). Phase 9 (validation completeness and the operator handbook) is next.
+Current status (as of Sept 2026): Phases 1–9 complete (engine, package, CLI, desktop, `qc.R`, security posture, encryption at rest, tagged release installers, validation completeness, operator handbook). Plan §12 (v1 scope) is fully implemented.

@@ -25,7 +25,7 @@ fn reference_tier_md_report_passes() {
 }
 
 #[test]
-fn regression_tier_reports_skip_when_empty() {
+fn regression_tier_reports_pass_against_algo_v1_fixtures() {
     let output = clinrand()
         .args([
             "validation-report",
@@ -42,10 +42,14 @@ fn regression_tier_reports_skip_when_empty() {
         stderr(&output)
     );
     let stdout = stdout(&output);
-    let lower = stdout.to_ascii_lowercase();
+    assert!(stdout.contains("algo-v1"), "stdout: {stdout}");
     assert!(
-        lower.contains("skip") || lower.contains("0 fixture"),
-        "expected skip/empty wording, stdout: {stdout}"
+        stdout.contains("algo-v1-simple-global: PASS"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        !stdout.to_ascii_uppercase().contains("SKIP"),
+        "regression tier must not skip once algo-v1 fixtures exist, stdout: {stdout}"
     );
 }
 

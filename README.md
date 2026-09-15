@@ -28,12 +28,15 @@ to **myIWRS**, a separate web application.
 
 ## Status
 
-Phases 1–8 are implemented: the engine, package writer, CLI, emitted
+Phases 1–9 are implemented: the engine, package writer, CLI, emitted
 `qc.R`, the Tauri 2 + SvelteKit **desktop application** (all §11.1
 screens, capability lock-down, and [`docs/security-posture.md`](docs/security-posture.md)),
 encryption at rest (`--encrypt` / `decrypt`, [`docs/output-package.md`](docs/output-package.md) §10),
-and a tagged release workflow ([`docs/release.md`](docs/release.md)).
-Phase 9 (validation completeness and the operator handbook) is next. See
+a tagged release workflow ([`docs/release.md`](docs/release.md)), and
+validation completeness — a real regression tier
+([`validation/regression/`](validation/regression/README.md)) and an
+[operator handbook](handbook/README.md) covering a complete study from
+config to approved package. Plan §12 (v1 scope) is fully implemented. See
 [`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md),
 [`docs/qc-procedure.md`](docs/qc-procedure.md),
 [`apps/desktop/README.md`](apps/desktop/README.md), and
@@ -50,8 +53,8 @@ Local builds require:
 just setup
 just test
 just lint
-just cli -- version
-just cli -- generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
+just cli version
+just cli generate --config examples/simple.json --out /tmp/out --operator "Jane Statistician"
 ```
 
 Without `just`:

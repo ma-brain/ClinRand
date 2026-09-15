@@ -1,0 +1,31 @@
+{
+  "case_id": "algo-v1-stratified-block-per-stratum-range",
+  "seed_hex": "9004000000000000000000000000000000000000000000000000000000000009",
+  "config": {
+    "schema_version": "1.0",
+    "study_id": "EXAMPLE-RANGE-1",
+    "protocol_version": "1.0",
+    "arms": [
+      { "code": "A", "label": "Active", "ratio": 1 },
+      { "code": "P", "label": "Placebo", "ratio": 1 }
+    ],
+    "method": "stratified_block",
+    "block": { "kind": "fixed", "size": 4 },
+    "strata": [
+      { "name": "site", "levels": ["001", "002"] }
+    ],
+    "list_length_per_stratum": 24,
+    "numbering": {
+      "kind": "per_stratum_range",
+      "start": 20001,
+      "block_size": 100,
+      "width": 5
+    }
+  },
+  "expected": {
+    "config_sha256": "564b29acc8d02e959285dedd33cc661981ac66bba9f68c3c2ccbd2a09b493206",
+    "list_sha256": "3e12b366a8cbe514f7787426020d149ac8c1db95cd75d4b8e442cf6003e1d61d",
+    "stream_sha256": "f72c148af142a7e0b4cc09cce8d968f57dd83c5a6025359a954ecbd421af0c0b",
+    "record_count": 48
+  }
+}

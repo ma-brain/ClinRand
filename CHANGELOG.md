@@ -10,6 +10,34 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 9 validation completeness and docs complete (plan §12): the
+  regression tier is real. New `validation/regression/algo-v1/` — 4
+  fixtures (one per `examples/*.json` config) pinning `(config, seed) ->
+  config_sha256/list_sha256/stream_sha256/record_count` for the current
+  engine. New `clinrand-package` module `regression`
+  (`load_regression_cases` / `check_regression_case` — loads and compares
+  only, never calls `generate`, matching `write_package`'s convention of
+  taking an already-built `GeneratedList`), reused by `clinrand
+  validation-report`, the desktop Validation screen, and a new
+  automated `cargo test -p clinrand-package --test regression_fixtures`
+  (AGENTS.md §8's non-negotiable "every regression fixture's `list_sha256`
+  matches" requirement). `clinrand validation-report` now renders real
+  PASS/FAIL for all three tiers — the regression tier is never a permanent
+  `SKIP`. New `validation/regression/README.md` states the
+  never-regenerate-the-hash rule and the fixture format; `validation/README.md`
+  updated accordingly. New `handbook/` (`README.md` +
+  `operator-workflow.md`): one continuous walkthrough from writing a config
+  to a formally approved, archived package, using
+  `examples/stratified-block-variable.json` throughout — every command in
+  it was run for real against this branch. `ALGO_VERSION` unchanged (1).
+  Also fixed two pre-existing documentation/tooling bugs found while
+  verifying that walkthrough: the `just cli -- <command>` pattern used
+  throughout `README.md`/`docs/cli.md` was broken (the `cli` recipe already
+  inserts its own `--`, so typing another one duplicates it and fails) —
+  corrected to `just cli <command>` everywhere; and the `cli` recipe's
+  `*ARGS` passthrough silently re-split quoted multi-word arguments (e.g.
+  `--operator "Jane Statistician"` became two arguments) — fixed with
+  `set positional-arguments := true` and `"$@"` in the justfile.
 - Phase 8 hardening and release complete: encryption at rest and a tagged
   release workflow (plan §12). `--encrypt` on `generate`/`reproduce` (CLI)
   and an "Encrypt restricted files" option on the desktop Generate screen

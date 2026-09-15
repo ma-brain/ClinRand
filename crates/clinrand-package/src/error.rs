@@ -98,6 +98,12 @@ pub enum PackageError {
         /// The file that would have been overwritten.
         path: std::path::PathBuf,
     },
+    /// A `validation/regression/algo-v*/*.json` fixture is not valid JSON
+    /// for the expected shape, or its `seed_hex` is malformed.
+    RegressionFixtureParse {
+        /// The fixture file that failed to parse.
+        path: std::path::PathBuf,
+    },
 }
 
 impl From<CanonicalError> for PackageError {
@@ -187,6 +193,11 @@ impl fmt::Display for PackageError {
                 "refuse to overwrite existing restricted file: {}",
                 path.display()
             ),
+            Self::RegressionFixtureParse { path } => write!(
+                f,
+                "regression fixture is not valid JSON for the expected shape: {}",
+                path.display()
+            ),
         }
     }
 }
@@ -213,7 +224,8 @@ impl std::error::Error for PackageError {
             | Self::KeyDerivationFailed
             | Self::DecryptionFailed
             | Self::ContainerCorrupt
-            | Self::RestrictedFileExists { .. } => None,
+            | Self::RestrictedFileExists { .. }
+            | Self::RegressionFixtureParse { .. } => None,
             Self::Canonical(err) => Some(err),
             Self::Io(err) => Some(err),
         }

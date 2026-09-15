@@ -13,4 +13,6 @@ criteria are met.
 - [x] Phase 6 — Emitted `qc.R` and `docs/qc-procedure.md`
 - [x] Phase 7 — Desktop application (Tauri 2 + SvelteKit, capability lock-down, `docs/security-posture.md`)
 - [x] Phase 8 — Encryption at rest (`restricted.age`, `--encrypt`/`decrypt`) and tagged release installers (`.github/workflows/release.yml`)
-- [ ] Phase 9 — Validation completeness (`validation/README.md`, regression rules, handbook)
+- [x] Phase 9 — Validation completeness (`validation/regression/algo-v1/` fixtures + README, `handbook/`)
+
+Plan §12 (v1 scope) is now fully implemented.

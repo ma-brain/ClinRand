@@ -1,0 +1,24 @@
+{
+  "case_id": "algo-v1-permuted-block-fixed-global",
+  "seed_hex": "9002000000000000000000000000000000000000000000000000000000000009",
+  "config": {
+    "schema_version": "1.0",
+    "study_id": "DEMO-PB-FIXED-1",
+    "protocol_version": "1.0",
+    "arms": [
+      { "code": "A", "label": "Active", "ratio": 1 },
+      { "code": "P", "label": "Placebo", "ratio": 1 }
+    ],
+    "method": "permuted_block",
+    "block": { "kind": "fixed", "size": 4 },
+    "strata": [],
+    "list_length_per_stratum": 24,
+    "numbering": { "kind": "global", "start": 10001, "width": 5 }
+  },
+  "expected": {
+    "config_sha256": "54fba9ac7c8211b388af2bce08169fdcd144fde0225c8bfe09deecc8b8ac02fc",
+    "list_sha256": "327bc79f80d0911f62a8c7e220d16fd81c7f7e8369a058fb2a4187c9323116ee",
+    "stream_sha256": "489c1c3dadc49f8f383304dde7455d378be1da0678ed4213af30e8ee0143843c",
+    "record_count": 24
+  }
+}
