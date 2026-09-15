@@ -10,6 +10,8 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Published study-config JSON Schema at `docs/schema/study-config-1.0.json`
+  and synthetic configs under `examples/` (wire format, plan §5.1).
 - `validate_config` in `clinrand-core` with every plan §5.2 reject
   rule, plus warnings for non-multiple `list_length_per_stratum` and
   `per_stratum_range` numbering disclosure (plan §5.6).

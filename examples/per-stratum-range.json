@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "study_id": "EXAMPLE-RANGE-1",
+  "protocol_version": "1.0",
+  "arms": [
+    { "code": "A", "label": "Active", "ratio": 1 },
+    { "code": "P", "label": "Placebo", "ratio": 1 }
+  ],
+  "method": "stratified_block",
+  "block": { "kind": "fixed", "size": 4 },
+  "strata": [
+    { "name": "site", "levels": ["001", "002"] }
+  ],
+  "list_length_per_stratum": 24,
+  "numbering": {
+    "kind": "per_stratum_range",
+    "start": 20001,
+    "block_size": 100,
+    "width": 5
+  }
+}

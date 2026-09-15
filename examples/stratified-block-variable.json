@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "study_id": "DEMO-201",
+  "protocol_version": "2.1",
+  "arms": [
+    { "code": "A", "label": "Investigational product 50 mg", "ratio": 2 },
+    { "code": "P", "label": "Placebo", "ratio": 1 }
+  ],
+  "method": "stratified_block",
+  "block": { "kind": "variable", "sizes": [6, 9] },
+  "strata": [
+    { "name": "site", "levels": ["001", "002", "003"] },
+    { "name": "agegrp", "levels": ["LT65", "GE65"] }
+  ],
+  "list_length_per_stratum": 36,
+  "numbering": { "kind": "global", "start": 10001, "width": 5 }
+}
