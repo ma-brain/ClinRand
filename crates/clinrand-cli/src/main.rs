@@ -44,7 +44,8 @@ fn dispatch(cli: &Cli) -> ExitCode {
             operator,
             allow_large_strata,
         } => commands::generate::run(cli.json, config, out, operator, *allow_large_strata),
-        Command::Reproduce { .. } | Command::Verify { .. } | Command::ValidationReport { .. } => {
+        Command::Reproduce { manifest, out } => commands::reproduce::run(cli.json, manifest, out),
+        Command::Verify { .. } | Command::ValidationReport { .. } => {
             stub_not_implemented(&cli.command)
         }
     }

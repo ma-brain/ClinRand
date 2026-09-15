@@ -13,7 +13,6 @@ pub enum ExitCode {
     /// I/O or parse failure.
     IoError = 3,
     /// Manifest `algo_version` differs from the binary.
-    #[expect(dead_code, reason = "used by reproduce in Task 5")]
     AlgoVersionMismatch = 4,
 }
 

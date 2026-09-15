@@ -63,16 +63,6 @@ fn list_methods_json_prints_array() {
 #[test]
 fn stub_commands_exit_check_failure() {
     for (args, name) in [
-        (
-            vec![
-                "reproduce",
-                "--manifest",
-                "missing.json",
-                "--out",
-                "/tmp/out",
-            ],
-            "reproduce",
-        ),
         (vec!["verify", "--package", "/tmp/pkg"], "verify"),
         (vec!["validation-report"], "validation-report"),
     ] {
