@@ -362,20 +362,35 @@ Must include: study id, protocol, `generated_at`, operator, full config
 (arms+ratios, method, blocks, strata, numbering), record counts per
 stratum, block structure (counts/sizes per stratum only — no arm
 composition), `seed_sha256` and data-file hashes, engine/algo versions,
-[`check_properties`] results (P01–P10), truncation warnings, and a
-`per_stratum_range` disclosure warning when that numbering is used.
+[`check_properties`] results (P01–P10 ids and pass/fail /
+informational only — **no** raw `PropertyCheck.detail` text), truncation
+warnings, and a `per_stratum_range` disclosure warning when that
+numbering is used.
+
+Per-stratum count and block-structure rows follow
+`stratum_combinations` **canonical config order** (plan §5.4), including
+combinations with count `0` / no blocks. Do not sort stratum presentation
+by label.
 
 Must **not** include: the seed (or `seed_hex`), any randomization-number
-↔ arm pairing, or per-block arm composition.
+↔ arm pairing, per-block arm composition, or property-check detail text
+that could name both a randomization number and an arm.
 
 Property results come from `clinrand_core::check_properties` — the
 package crate does not reimplement P01–P10.
 
-CI enforces blind-safety: for every randomization number in the list, no
-line of the rendered blinded HTML contains both that number and any arm
-code from the config. The seed hex string must not appear.
+CI enforces blind-safety on a real `generate()`-derived DEMO list: for
+every randomization number, no line of the rendered blinded HTML contains
+both that number and any arm code (delimiter-aware tokens). The same
+assertion run against `unblinded-report.html` must find at least one
+violating line (negative control). The seed hex string must not appear.
+
+Two `write_package` runs with the same `(config, seed, meta)` produce
+byte-identical `list.csv` and `stream.csv`; `checksums.txt` verifies
+including both HTML files.
 
 ### 9.2 `unblinded-report.html` (restricted)
 
-Same metadata and property sections, plus a full allocation table
-(randomization number ↔ arm). Still never writes the seed.
+Same metadata sections, plus full property-check **details** and a full
+allocation table (randomization number ↔ arm). Still never writes the
+seed.

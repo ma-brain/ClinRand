@@ -8,8 +8,8 @@ use std::fs;
 use std::path::Path;
 
 use clinrand_core::{
-    AllocationRecord, Arm, BlockScheme, DrawPurpose, GeneratedList, Method, NumberingScheme,
-    StreamDraw, StreamLog, StudyConfig,
+    generate, AllocationRecord, Arm, BlockScheme, DrawPurpose, GeneratedList, Method,
+    NumberingScheme, StreamDraw, StreamLog, StudyConfig,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -254,5 +254,54 @@ fn package_error_io_display_has_no_seed() {
     assert!(
         !msg.contains(&seed_hex),
         "PackageError Display must not contain the seed"
+    );
+}
+
+#[test]
+fn two_write_package_runs_are_byte_identical_for_list_and_stream() {
+    let cfg = demo_cfg();
+    let seed = demo_seed();
+    let list = generate(&cfg, seed).expect("generate");
+    let meta = meta();
+
+    let tmp_a = tempfile::tempdir().expect("tempdir a");
+    let tmp_b = tempfile::tempdir().expect("tempdir b");
+    let dir_a = write_package(tmp_a.path(), &cfg, &list, &seed, &meta).expect("write a");
+    let dir_b = write_package(tmp_b.path(), &cfg, &list, &seed, &meta).expect("write b");
+
+    let list_a = fs::read(dir_a.join("list.csv")).expect("list a");
+    let list_b = fs::read(dir_b.join("list.csv")).expect("list b");
+    assert_eq!(
+        list_a, list_b,
+        "list.csv must be byte-identical across runs"
+    );
+
+    let stream_a = fs::read(dir_a.join("stream.csv")).expect("stream a");
+    let stream_b = fs::read(dir_b.join("stream.csv")).expect("stream b");
+    assert_eq!(
+        stream_a, stream_b,
+        "stream.csv must be byte-identical across runs"
+    );
+
+    // checksums.txt still verifies with HTML files included (same fixture as
+    // checksums_txt_matches_recomputed_file_hashes, re-checked on generate() output).
+    let checksums = fs::read_to_string(dir_a.join("checksums.txt")).expect("checksums");
+    for line in checksums.lines() {
+        let (hex, name) = line
+            .split_once("  ")
+            .expect("GNU sha256sum text mode: `hex  filename`");
+        let bytes = fs::read(dir_a.join(name)).expect("read file");
+        let mut hasher = Sha256::new();
+        hasher.update(&bytes);
+        let recomputed: String = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(hex, recomputed, "mismatch for {name}");
+    }
+    assert!(
+        checksums.contains("generation-report.html") && checksums.contains("unblinded-report.html"),
+        "checksums must cover HTML reports"
     );
 }

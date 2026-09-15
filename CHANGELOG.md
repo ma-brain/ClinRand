@@ -10,14 +10,21 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 4 package writer complete: `write_package` E2E invariant that two
+  runs with the same `(config, seed, meta)` produce byte-identical
+  `list.csv` / `stream.csv`, with `checksums.txt` verifying HTML-inclusive
+  digests. Phase 4 ticked in `TODO.md`. `ALGO_VERSION` unchanged (1).
 - Blinded `generation-report.html` and restricted `unblinded-report.html`
   in `clinrand-package` (`render_generation_report` /
   `render_unblinded_report`), integrated into `write_package` so
   `checksums.txt` covers both HTML files. Property results come from
-  `check_properties`. Mandatory blind-safety CI test: no line of the
-  blinded report may contain both a randomization number and an arm
-  code; seed hex absent. No templating crate. `ALGO_VERSION` unchanged
-  (1).
+  `check_properties`. Blinded report emits check id + pass/fail
+  (+ informational) only; full `PropertyCheck.detail` text is unblinded-
+  only. Per-stratum counts/blocks follow canonical `stratum_combinations`
+  order (including zeros). Mandatory blind-safety CI test on a real
+  `generate()` DEMO list with delimiter-aware pairing and an unblinded
+  negative control; seed hex absent. No templating crate. `ALGO_VERSION`
+  unchanged (1).
 - `write_package` in `clinrand-package`: writes
   `<study_id>_<compact generated_at>_<list_sha256[:8]>/` with
   `list.csv` / `list.json` / `stream.csv`, both manifests (exact
