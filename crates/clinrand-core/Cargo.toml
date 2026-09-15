@@ -12,3 +12,13 @@ publish = false
 rand_chacha = "=0.3.1"
 # Version required by rand_chacha 0.3.1; RngCore / SeedableRng only.
 rand_core = "=0.6.4"
+# JSON (de)serialization of StudyConfig; required by the crate-boundary table.
+serde = { version = "=1.0.229", features = ["derive"] }
+# Typed ConfigError for validate_config (plan §5.2). Exact pin: validation surface.
+thiserror = "=2.0.20"
+
+[dev-dependencies]
+# JSON fixtures for StudyConfig serde round-trip tests only.
+serde_json = "=1.0.151"
+# Validates examples/ against the published study-config schema. Tests only; HTTP resolver off.
+jsonschema = { version = "=0.53.0", default-features = false }

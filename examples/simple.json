@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "study_id": "DEMO-SIMPLE-1",
+  "protocol_version": "1.0",
+  "arms": [
+    { "code": "A", "label": "Active", "ratio": 1 },
+    { "code": "P", "label": "Placebo", "ratio": 1 }
+  ],
+  "method": "simple",
+  "strata": [],
+  "list_length_per_stratum": 24,
+  "numbering": { "kind": "global", "start": 10001, "width": 5 }
+}
