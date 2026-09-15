@@ -135,10 +135,10 @@ for i in (1..len).rev():
 ```
 
 `j` is always in `0..(i + 1)` inclusive of `i`. The descending loop order is
-part of the contract.
+part of the contract. Length 0 and length 1 perform no draws.
 
-*(Implemented in Phase 3; specified here because it governs stream
-consumption.)*
+Implemented as `clinrand_core::permute`. Hand-worked reference cases live
+under [`validation/reference/fisher-yates/`](../validation/reference/fisher-yates/).
 
 ---
 
@@ -153,10 +153,37 @@ For each stratum, and for each block in ascending block index:
 1. **Block size** (variable blocks only): draw
    `uniform_below(rng, log, sizes.len(), BlockSize)` and use the result to
    index into the sorted, deduplicated `sizes` array.
-2. Build the block's arm multiset from the integer allocation ratios.
+2. **Arm multiset:** for each arm in **config order**, append contiguous
+   copies of that arm's `code`, exactly
+   `ratio * (block_size / ratio_sum)` times. Block size is always a
+   multiple of `ratio_sum` (enforced by validation; the allocation path
+   also rejects a non-multiple rather than dropping a remainder).
 3. **Permute** the multiset with Fisher–Yates (§4).
 
 Fixed block size skips step 1.
+
+### Truncation (plan §5.5)
+
+If keeping the full block would exceed the remaining positions needed for
+`list_length_per_stratum`, the engine still builds and permutes the **full**
+block (consuming the full stream for that block), then keeps only the
+**leading** positions required to reach the target length. Truncated
+trailing positions are discarded after permutation; they never appear in
+the emitted list.
+
+### Simple randomization
+
+For `method: simple`, there is no block-size draw and no Fisher–Yates.
+For each stratum in canonical order, and for each position in
+`0..list_length_per_stratum`:
+
+1. Draw `uniform_below(rng, log, ratio_sum, SimpleAllocation)`.
+2. Map the draw to an arm via cumulative ratios in **config arm order**
+   (the first arm owns `[0, ratio)`, the next owns the following
+   `ratio` integers, and so on).
+
+Each position is recorded as a size-1 block (`block_id` ascending from
+1 within the stratum, `block_size = 1`, `position_in_block = 1`).
 
 ---
 
@@ -205,6 +232,7 @@ from the binary's. There is no bypass flag.
 |---|---|---|
 | Reference | [`validation/reference/chacha20/`](../validation/reference/chacha20/) | ChaCha20 keystream matches [RFC 8439](https://www.rfc-editor.org/rfc/rfc8439.html) §2.3.2 and §2.4.2 |
 | Reference | [`validation/reference/uniform-below/`](../validation/reference/uniform-below/) | `uniform_below` matches hand-worked rejection-sampling arithmetic |
+| Reference | [`validation/reference/fisher-yates/`](../validation/reference/fisher-yates/) | Descending Fisher–Yates matches hand-worked permutations over a documented keystream |
 
 These tiers carry **correctness** evidence from external or hand-derived
 norms. They are not regression fixtures; expected values were not taken from

@@ -10,6 +10,24 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Property suite (`proptest`, 1000 cases) and named determinism tests in
+  `clinrand-core`: arbitrary valid configs must satisfy P01–P09 via
+  `all_required_passed`, and `generate` is byte-stable under a fixed seed
+  while a one-bit seed flip changes the list. Epistemic note under
+  `validation/properties/README.md`.
+- `check_properties` / `PropertyReport` in `clinrand-core` for plan §7
+  checks P01–P10. P10 is informational only and never fails. P03/P08 exempt
+  only truncated final blocks per stratum; non-final under-full blocks fail.
+  Simple size-1 blocks skip ratio-bearing P03/P09 rules. P09 uses integer
+  one-block tolerance for block methods.
+- `generate` in `clinrand-core` for `simple`, `permuted_block`, and
+  `stratified_block`: block truncation (§5.5), global and
+  `per_stratum_range` numbering (§5.6), one shared RNG/stream per run.
+  Numbering width overflow policy in `docs/decisions/0005-*.md`.
+  Simple stream order documented in `docs/determinism.md`.
+- Descending Fisher–Yates `permute` in `clinrand-core` (plan §2.3) with
+  hand-worked reference cases under `validation/reference/fisher-yates/`.
+- Canonical stratum Cartesian product `stratum_combinations` (plan §5.4).
 - `canonical_json_value` in `clinrand-package`: the same plan §6.4
   canonicalizer over a `serde_json::Value`, so Phase 4 can reuse one
   implementation. `canonical_json(&StudyConfig)` calls it.
@@ -36,6 +54,9 @@ is never changed as a side effect of another change.
 
 ### Changed
 
+- Plan §5.2 and `validate_config` reject `per_stratum_range` when
+  `block_size < list_length_per_stratum` (`ConfigError::PerStratumRangeTooSmall`).
+  Disclosure remains a warning. Decision 0006 updated.
 - `validate_config` rejects block size `0` (`ConfigError::BlockSizeZero`)
   for fixed `size` and any entry in variable `sizes`. Size `0` is a
   multiple of every ratio sum (`0 % n == 0`) and was previously accepted.

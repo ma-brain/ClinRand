@@ -268,6 +268,7 @@ Publish this as a JSON Schema file at `docs/schema/study-config-1.0.json` and va
 - Total stratum combinations `> 200` (sanity guard; configurable override flag)
 - `method == stratified_block` with an empty `strata` array
 - `method == permuted_block` with a non-empty `strata` array
+- `numbering.kind == per_stratum_range` with `block_size < list_length_per_stratum` (reserved ranges would overlap and produce duplicate randomization numbers)
 
 ### 5.3 Stratum combinations
 
@@ -294,7 +295,7 @@ With reserved per-stratum ranges, the randomization number itself discloses stra
 
 Reserved ranges remain supported because they are operationally useful — site-shipped pre-printed kits, and sponsors or downstream systems that mandate site-based number ranges. But the choice must be deliberate:
 
-- `validate_config` accepts `per_stratum_range` without error.
+- `validate_config` accepts `per_stratum_range` without error for the disclosure risk itself; overlapping ranges (`block_size < list_length_per_stratum`) are rejected under §5.2.
 - `clinrand generate` prints a warning to stderr naming the disclosure risk whenever `per_stratum_range` is used, and records the warning in both reports.
 - The desktop config builder shows the same warning inline next to the field, not in a dismissible toast.
 - No configuration may set `per_stratum_range` implicitly or by default.

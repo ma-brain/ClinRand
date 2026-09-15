@@ -86,6 +86,12 @@ pub enum ConfigError {
     /// `permuted_block` must not be stratified.
     #[error("permuted_block must not include strata")]
     PermutedBlockNonEmptyStrata,
+    /// `per_stratum_range` reserved range size is smaller than the per-stratum
+    /// list length, so adjacent strata would share randomization numbers.
+    #[error(
+        "per_stratum_range block_size {block_size} is less than list_length_per_stratum {list_length}"
+    )]
+    PerStratumRangeTooSmall { block_size: u32, list_length: u32 },
 }
 
 /// Non-fatal disclosure or truncation notes from [`validate_config`].
@@ -170,7 +176,13 @@ pub fn validate_config(
         }
     }
 
-    if matches!(cfg.numbering, NumberingScheme::PerStratumRange { .. }) {
+    if let NumberingScheme::PerStratumRange { block_size, .. } = cfg.numbering {
+        if block_size < cfg.list_length_per_stratum {
+            errors.push(ConfigError::PerStratumRangeTooSmall {
+                block_size,
+                list_length: cfg.list_length_per_stratum,
+            });
+        }
         warnings.push(ConfigWarning::PerStratumRangeDisclosure);
     }
 

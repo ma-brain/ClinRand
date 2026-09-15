@@ -1,7 +1,8 @@
 //! Mechanical crate-boundary check: the engine must not touch I/O or OS entropy.
 //!
 //! Scans `src/` rather than relying on code review to keep `clinrand-core`
-//! free of `std::fs`, `std::env`, `std::time`, and `getrandom`.
+//! free of `std::fs`, `std::env`, `std::time`, `getrandom`, and non-contract
+//! RNG APIs (`thread_rng`, `StdRng`, `SmallRng`, `OsRng`, `rand::random`).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -25,7 +26,17 @@ fn source_tree_forbids_io_and_os_entropy() {
     rust_files(&src_dir, &mut files);
     assert!(!files.is_empty(), "expected Rust sources under src/");
 
-    let forbidden = ["std::fs", "std::env", "std::time", "getrandom"];
+    let forbidden = [
+        "std::fs",
+        "std::env",
+        "std::time",
+        "getrandom",
+        "thread_rng",
+        "StdRng",
+        "SmallRng",
+        "OsRng",
+        "rand::random",
+    ];
     for path in files {
         let text = fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()));
