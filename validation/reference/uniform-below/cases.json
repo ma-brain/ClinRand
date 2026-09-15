@@ -1,0 +1,75 @@
+{
+  "primitiveId": "uniform-below",
+  "cases": [
+    {
+      "caseId": "n_eq_0_error",
+      "source": "plan §2.2 step 1",
+      "input": {
+        "n": 0,
+        "keystream": ["5"],
+        "purpose": "SimpleAllocation"
+      },
+      "expect": {
+        "error": "zero_bound",
+        "consumed": 0,
+        "stream": []
+      }
+    },
+    {
+      "caseId": "n_eq_1_zero_consumption",
+      "source": "plan §2.2 step 1",
+      "input": {
+        "n": 1,
+        "keystream": ["5"],
+        "purpose": "SimpleAllocation"
+      },
+      "expect": {
+        "value": 0,
+        "consumed": 0,
+        "stream": []
+      }
+    },
+    {
+      "caseId": "n_eq_3_no_rejection",
+      "source": "plan §2.2 steps 2–3",
+      "input": {
+        "n": 3,
+        "keystream": ["5"],
+        "purpose": "Permutation"
+      },
+      "expect": {
+        "value": 2,
+        "consumed": 1,
+        "stream": [
+          {
+            "index": 0,
+            "bound": 3,
+            "value": 2,
+            "purpose": "Permutation"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "n_eq_2_rejection",
+      "source": "plan §2.2 step 3",
+      "input": {
+        "n": 2,
+        "keystream": ["18446744073709551614", "7"],
+        "purpose": "BlockSize"
+      },
+      "expect": {
+        "value": 1,
+        "consumed": 2,
+        "stream": [
+          {
+            "index": 0,
+            "bound": 2,
+            "value": 1,
+            "purpose": "BlockSize"
+          }
+        ]
+      }
+    }
+  ]
+}
