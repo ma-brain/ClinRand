@@ -18,7 +18,7 @@ pub use canonical::{
     canonical_json, canonical_json_value, config_sha256, config_sha256_digest, sha256_hex,
     CanonicalError,
 };
-pub use clinrand_core::ALGO_VERSION;
+pub use clinrand_core::{ALGO_VERSION, ENGINE_VERSION, RNG_CRATE_VERSION};
 pub use error::PackageError;
 pub use list::{render_list_csv, render_list_json};
 pub use manifest::{

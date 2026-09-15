@@ -43,9 +43,10 @@ const PACKAGE_FILES: &[&str] = &[
 ///
 /// # Errors
 ///
-/// Propagates render / manifest failures and filesystem I/O errors.
-/// [`PackageError`](crate::PackageError) [`Display`](std::fmt::Display)
-/// never includes the seed.
+/// Returns [`PackageError::PackageDirExists`] if the target package directory
+/// already exists (refuse overwrite). Propagates render / manifest failures
+/// and filesystem I/O errors. [`PackageError`](crate::PackageError)
+/// [`Display`](std::fmt::Display) never includes the seed.
 pub fn write_package(
     out_dir: &Path,
     cfg: &StudyConfig,
@@ -79,6 +80,10 @@ pub fn write_package(
         &list_sha256[..8]
     );
     let package_dir = out_dir.join(dir_name);
+
+    if package_dir.exists() {
+        return Err(PackageError::PackageDirExists { path: package_dir });
+    }
 
     fs::create_dir_all(&package_dir).map_err(PackageError::from)?;
 

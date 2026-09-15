@@ -10,6 +10,14 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 4 final-review hardenings: `write_package` refuses overwrite of an
+  existing package directory; E2E calls `generate` twice then writes under
+  distinct parent dirs and asserts equal lists plus byte-identical
+  `list.csv` / `stream.csv`; manifests/reports take
+  `clinrand_core::ENGINE_VERSION` and `RNG_CRATE_VERSION`; blinded report
+  states P10 must not cause regeneration and includes arm-code-safe P10
+  max-run detail. `PackageMeta::new` / `build_manifests` validate
+  `generated_at` as `YYYY-MM-DDTHH:MM:SSZ`. `ALGO_VERSION` unchanged (1).
 - Phase 4 package writer complete: `write_package` E2E invariant that two
   runs with the same `(config, seed, meta)` produce byte-identical
   `list.csv` / `stream.csv`, with `checksums.txt` verifying HTML-inclusive
@@ -19,8 +27,9 @@ is never changed as a side effect of another change.
   `render_unblinded_report`), integrated into `write_package` so
   `checksums.txt` covers both HTML files. Property results come from
   `check_properties`. Blinded report emits check id + pass/fail
-  (+ informational) only; full `PropertyCheck.detail` text is unblinded-
-  only. Per-stratum counts/blocks follow canonical `stratum_combinations`
+  (+ informational), a P10 no-regeneration policy sentence, and safe P10
+  max-run detail; other `PropertyCheck.detail` text is unblinded-only.
+  Per-stratum counts/blocks follow canonical `stratum_combinations`
   order (including zeros). Mandatory blind-safety CI test on a real
   `generate()` DEMO list with delimiter-aware pairing and an unblinded
   negative control; seed hex absent. No templating crate. `ALGO_VERSION`

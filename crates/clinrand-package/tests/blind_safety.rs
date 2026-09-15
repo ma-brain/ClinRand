@@ -183,18 +183,29 @@ fn unblinded_report_negative_control_detects_rand_arm_pairing() {
 }
 
 #[test]
-fn blinded_report_omits_property_check_details() {
+fn blinded_report_property_details_policy() {
     let (cfg, list) = demo_list();
     let blinded = render_generation_report(&cfg, &list, &meta(), &demo_hashes());
     let unblinded = render_unblinded_report(&cfg, &list, &meta(), &demo_hashes());
 
     assert!(
-        !blinded.contains("detail:"),
-        "blinded report must not emit PropertyCheck.detail text"
+        blinded.contains("P10 is informational only and must not cause regeneration"),
+        "blinded report must state P10 must not cause regeneration"
     );
     assert!(
-        unblinded.contains("detail:"),
-        "unblinded report must still include property details"
+        blinded.contains("global_max=") || blinded.contains("max_run="),
+        "blinded report should include P10 max-run detail when arm-code-safe"
+    );
+
+    let blinded_detail_lines = blinded.lines().filter(|l| l.contains("detail:")).count();
+    let unblinded_detail_lines = unblinded.lines().filter(|l| l.contains("detail:")).count();
+    assert_eq!(
+        blinded_detail_lines, 1,
+        "blinded report may include only P10 detail, got {blinded_detail_lines}"
+    );
+    assert!(
+        unblinded_detail_lines >= 10,
+        "unblinded report must still include all property details"
     );
     assert!(blinded.contains("P01"));
     assert!(

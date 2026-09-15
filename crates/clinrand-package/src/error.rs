@@ -17,6 +17,16 @@ pub enum PackageError {
         /// Randomization number of the incomplete record.
         randomization_number: String,
     },
+    /// `PackageMeta.generated_at` is not `YYYY-MM-DDTHH:MM:SSZ`.
+    InvalidGeneratedAt {
+        /// The rejected timestamp string (never a seed).
+        value: String,
+    },
+    /// Target package directory already exists; refuse overwrite.
+    PackageDirExists {
+        /// Absolute or relative path that already exists.
+        path: std::path::PathBuf,
+    },
     /// Canonical JSON or `config_sha256` failed.
     Canonical(CanonicalError),
     /// Filesystem create/write failed while assembling a package directory.
@@ -45,6 +55,15 @@ impl fmt::Display for PackageError {
                 f,
                 "allocation {randomization_number} is missing stratum factor `{factor}`"
             ),
+            Self::InvalidGeneratedAt { value } => write!(
+                f,
+                "generated_at must be YYYY-MM-DDTHH:MM:SSZ, got `{value}`"
+            ),
+            Self::PackageDirExists { path } => write!(
+                f,
+                "package directory already exists (refuse overwrite): {}",
+                path.display()
+            ),
             Self::Canonical(err) => write!(f, "{err}"),
             Self::Io(err) => write!(f, "package I/O failed: {err}"),
         }
@@ -54,7 +73,9 @@ impl fmt::Display for PackageError {
 impl std::error::Error for PackageError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::MissingStratumFactor { .. } => None,
+            Self::MissingStratumFactor { .. }
+            | Self::InvalidGeneratedAt { .. }
+            | Self::PackageDirExists { .. } => None,
             Self::Canonical(err) => Some(err),
             Self::Io(err) => Some(err),
         }

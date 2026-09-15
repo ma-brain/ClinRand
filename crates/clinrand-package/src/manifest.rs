@@ -4,7 +4,7 @@
 //! a trailing `\n`. `list_sha256` / `stream_sha256` digest the exact UTF-8
 //! bytes from [`crate::render_list_csv`] / [`crate::render_stream_csv`].
 
-use clinrand_core::{GeneratedList, StudyConfig, ALGO_VERSION};
+use clinrand_core::{GeneratedList, StudyConfig, ALGO_VERSION, ENGINE_VERSION, RNG_CRATE_VERSION};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -22,18 +22,69 @@ pub const MANIFEST_SCHEMA_VERSION: &str = "1.0";
 /// `rand_chacha` used by `clinrand-core`.
 const RNG_ALGORITHM: &str = "ChaCha20";
 const RNG_CRATE: &str = "rand_chacha";
-const RNG_CRATE_VERSION: &str = "0.3.1";
 
 /// Caller-supplied metadata that is not derived from `(config, seed)`.
 ///
-/// `generated_at` is an ISO-8601 UTC timestamp ending in `Z` (e.g.
-/// `2026-09-15T14:42:10Z`). The package crate does not read the clock.
+/// `generated_at` must be `YYYY-MM-DDTHH:MM:SSZ` (e.g. `2026-09-15T14:42:10Z`).
+/// The package crate does not read the clock.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackageMeta {
     /// Operator name written to both manifests.
     pub operator: String,
-    /// Pre-formatted generation timestamp (`…Z`).
+    /// Pre-formatted generation timestamp (`YYYY-MM-DDTHH:MM:SSZ`).
     pub generated_at: String,
+}
+
+impl PackageMeta {
+    /// Construct metadata after validating `generated_at` as `YYYY-MM-DDTHH:MM:SSZ`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::InvalidGeneratedAt`] when the timestamp shape is wrong.
+    pub fn new(
+        operator: impl Into<String>,
+        generated_at: impl Into<String>,
+    ) -> Result<Self, PackageError> {
+        let generated_at = generated_at.into();
+        validate_generated_at(&generated_at)?;
+        Ok(Self {
+            operator: operator.into(),
+            generated_at,
+        })
+    }
+}
+
+/// Reject timestamps that are not exactly `YYYY-MM-DDTHH:MM:SSZ`.
+fn validate_generated_at(generated_at: &str) -> Result<(), PackageError> {
+    let b = generated_at.as_bytes();
+    let ok = b.len() == 20
+        && b[0].is_ascii_digit()
+        && b[1].is_ascii_digit()
+        && b[2].is_ascii_digit()
+        && b[3].is_ascii_digit()
+        && b[4] == b'-'
+        && b[5].is_ascii_digit()
+        && b[6].is_ascii_digit()
+        && b[7] == b'-'
+        && b[8].is_ascii_digit()
+        && b[9].is_ascii_digit()
+        && b[10] == b'T'
+        && b[11].is_ascii_digit()
+        && b[12].is_ascii_digit()
+        && b[13] == b':'
+        && b[14].is_ascii_digit()
+        && b[15].is_ascii_digit()
+        && b[16] == b':'
+        && b[17].is_ascii_digit()
+        && b[18].is_ascii_digit()
+        && b[19] == b'Z';
+    if ok {
+        Ok(())
+    } else {
+        Err(PackageError::InvalidGeneratedAt {
+            value: generated_at.to_owned(),
+        })
+    }
 }
 
 /// In-memory blinded and unblinded manifest file contents.
@@ -56,13 +107,16 @@ pub struct ManifestPair {
 /// # Errors
 ///
 /// Propagates list/stream render failures and canonicalization / config hash
-/// failures. Error [`Display`](std::fmt::Display) never includes the seed.
+/// failures. Rejects invalid `generated_at`. Error [`Display`](std::fmt::Display)
+/// never includes the seed.
 pub fn build_manifests(
     cfg: &StudyConfig,
     list: &GeneratedList,
     seed: &[u8; 32],
     meta: &PackageMeta,
 ) -> Result<ManifestPair, PackageError> {
+    validate_generated_at(&meta.generated_at)?;
+
     let list_csv = render_list_csv(cfg, list)?;
     let stream_csv = render_stream_csv(&list.stream)?;
 
@@ -75,15 +129,13 @@ pub fn build_manifests(
     let config_value = serde_json::to_value(cfg)
         .map_err(|err| PackageError::from(CanonicalError::Serialize(err)))?;
 
-    let engine_version = env!("CARGO_PKG_VERSION");
-
     let common = common_manifest_fields(
         cfg,
         meta,
         config_value,
         &config_digest,
         &seed_digest,
-        engine_version,
+        ENGINE_VERSION,
         list.records.len(),
         &list_sha256,
         &stream_sha256,

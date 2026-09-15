@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use clinrand_core::{
     AllocationRecord, Arm, BlockScheme, DrawPurpose, GeneratedList, Method, NumberingScheme,
-    StreamDraw, StreamLog, StudyConfig, ALGO_VERSION,
+    StreamDraw, StreamLog, StudyConfig, ALGO_VERSION, ENGINE_VERSION, RNG_CRATE_VERSION,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -193,7 +193,7 @@ fn manifest_fields_match_contract() {
         assert_eq!(v["generated_at"], "2026-09-15T14:42:10Z");
         assert_eq!(v["operator"], "Demo Operator");
         assert_eq!(v["algo_version"], ALGO_VERSION);
-        assert_eq!(v["engine_version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(v["engine_version"], ENGINE_VERSION);
         assert_eq!(v["record_count"], 2);
         assert_eq!(
             v["config_sha256"].as_str().expect("config_sha256"),
@@ -201,7 +201,7 @@ fn manifest_fields_match_contract() {
         );
         assert_eq!(v["rng"]["algorithm"], "ChaCha20");
         assert_eq!(v["rng"]["crate"], "rand_chacha");
-        assert_eq!(v["rng"]["crate_version"], "0.3.1");
+        assert_eq!(v["rng"]["crate_version"], RNG_CRATE_VERSION);
         assert!(v.get("config").is_some());
     }
 

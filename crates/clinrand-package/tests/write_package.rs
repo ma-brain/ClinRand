@@ -258,29 +258,34 @@ fn package_error_io_display_has_no_seed() {
 }
 
 #[test]
-fn two_write_package_runs_are_byte_identical_for_list_and_stream() {
+fn two_generate_write_package_runs_are_byte_identical_for_list_and_stream() {
     let cfg = demo_cfg();
     let seed = demo_seed();
-    let list = generate(&cfg, seed).expect("generate");
+    let list_a = generate(&cfg, seed).expect("generate a");
+    let list_b = generate(&cfg, seed).expect("generate b");
+    assert_eq!(
+        list_a, list_b,
+        "generate twice with the same seed must yield equal lists"
+    );
     let meta = meta();
 
     let tmp_a = tempfile::tempdir().expect("tempdir a");
     let tmp_b = tempfile::tempdir().expect("tempdir b");
-    let dir_a = write_package(tmp_a.path(), &cfg, &list, &seed, &meta).expect("write a");
-    let dir_b = write_package(tmp_b.path(), &cfg, &list, &seed, &meta).expect("write b");
+    let dir_a = write_package(tmp_a.path(), &cfg, &list_a, &seed, &meta).expect("write a");
+    let dir_b = write_package(tmp_b.path(), &cfg, &list_b, &seed, &meta).expect("write b");
 
-    let list_a = fs::read(dir_a.join("list.csv")).expect("list a");
-    let list_b = fs::read(dir_b.join("list.csv")).expect("list b");
+    let list_csv_a = fs::read(dir_a.join("list.csv")).expect("list a");
+    let list_csv_b = fs::read(dir_b.join("list.csv")).expect("list b");
     assert_eq!(
-        list_a, list_b,
-        "list.csv must be byte-identical across runs"
+        list_csv_a, list_csv_b,
+        "list.csv must be byte-identical across generate+write runs"
     );
 
     let stream_a = fs::read(dir_a.join("stream.csv")).expect("stream a");
     let stream_b = fs::read(dir_b.join("stream.csv")).expect("stream b");
     assert_eq!(
         stream_a, stream_b,
-        "stream.csv must be byte-identical across runs"
+        "stream.csv must be byte-identical across generate+write runs"
     );
 
     // checksums.txt still verifies with HTML files included (same fixture as
@@ -303,5 +308,30 @@ fn two_write_package_runs_are_byte_identical_for_list_and_stream() {
     assert!(
         checksums.contains("generation-report.html") && checksums.contains("unblinded-report.html"),
         "checksums must cover HTML reports"
+    );
+}
+
+#[test]
+fn write_package_refuses_overwrite_of_existing_package_dir() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let cfg = demo_cfg();
+    let list = demo_list();
+    let seed = demo_seed();
+    let meta = meta();
+
+    let dir = write_package(tmp.path(), &cfg, &list, &seed, &meta).expect("first write");
+    assert!(dir.is_dir());
+
+    let err = write_package(tmp.path(), &cfg, &list, &seed, &meta)
+        .expect_err("second write must refuse overwrite");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("already exists") || msg.contains("refuse overwrite"),
+        "error should mention refuse overwrite, got: {msg}"
+    );
+    let seed_hex: String = seed.iter().map(|b| format!("{b:02x}")).collect();
+    assert!(
+        !msg.contains(&seed_hex),
+        "PackageError Display must not contain the seed"
     );
 }

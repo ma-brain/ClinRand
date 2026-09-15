@@ -281,8 +281,13 @@ Shared by both manifests: `schema_version` (`"1.0"`), `study_id`,
 `protocol_version`, `generated_at`, `operator`, `config` (full
 `StudyConfig` wire object), `config_sha256`, `seed_sha256`, `rng`
 (`algorithm` / `crate` / `crate_version`), `engine_version`
-(workspace package version), `algo_version`, `record_count`,
-`list_sha256`, `stream_sha256`.
+(`clinrand_core::ENGINE_VERSION` = core crate `CARGO_PKG_VERSION`),
+`algo_version`, `record_count`, `list_sha256`, `stream_sha256`.
+`rng.crate_version` is `clinrand_core::RNG_CRATE_VERSION` and must stay
+in sync with the exact `rand_chacha = "=…"` pin in `clinrand-core`.
+
+`generated_at` must be exactly `YYYY-MM-DDTHH:MM:SSZ` (`PackageMeta::new`
+and `build_manifests` validate). The package crate does not read the clock.
 
 Unblinded only: `seed_hex` (64 lowercase hex characters of the raw
 32-byte seed). Blinded omits the `seed_hex` **key** entirely; it still
@@ -305,7 +310,9 @@ All digests are SHA-256 encoded as 64 lowercase hex characters.
 
 `write_package(out_dir, cfg, list, seed, meta) -> Result<PathBuf, PackageError>`
 creates a package directory and writes the Phase 4 file set (no `qc.R`),
-including both HTML reports.
+including both HTML reports. If the target package directory already
+exists, `write_package` returns [`PackageError::PackageDirExists`] and
+does not overwrite.
 
 ### 8.1 Directory name
 
@@ -361,20 +368,25 @@ Hand-rolled `format!` HTML in `clinrand-package` (no templating crate).
 Must include: study id, protocol, `generated_at`, operator, full config
 (arms+ratios, method, blocks, strata, numbering), record counts per
 stratum, block structure (counts/sizes per stratum only — no arm
-composition), `seed_sha256` and data-file hashes, engine/algo versions,
-[`check_properties`] results (P01–P10 ids and pass/fail /
-informational only — **no** raw `PropertyCheck.detail` text), truncation
+composition), `seed_sha256` and data-file hashes, engine/algo versions
+(engine from `clinrand_core::ENGINE_VERSION`), [`check_properties`]
+results (P01–P10 ids and pass/fail / informational), a static sentence
+that **P10 is informational only and must not cause regeneration**, and
+the P10 max-run detail when that detail contains no config arm-code
+tokens. Other property-check details are omitted. Also truncation
 warnings, and a `per_stratum_range` disclosure warning when that
 numbering is used.
 
 Per-stratum count and block-structure rows follow
 `stratum_combinations` **canonical config order** (plan §5.4), including
 combinations with count `0` / no blocks. Do not sort stratum presentation
-by label.
+by label. Numbering `start` / `width` (and `block_size`) are emitted on
+separate HTML lines from `kind=` to avoid blind-safety false positives
+with numeric arm codes.
 
 Must **not** include: the seed (or `seed_hex`), any randomization-number
-↔ arm pairing, per-block arm composition, or property-check detail text
-that could name both a randomization number and an arm.
+↔ arm pairing, per-block arm composition, or non-P10 property-check
+detail text that could name both a randomization number and an arm.
 
 Property results come from `clinrand_core::check_properties` — the
 package crate does not reimplement P01–P10.
@@ -385,9 +397,9 @@ both that number and any arm code (delimiter-aware tokens). The same
 assertion run against `unblinded-report.html` must find at least one
 violating line (negative control). The seed hex string must not appear.
 
-Two `write_package` runs with the same `(config, seed, meta)` produce
-byte-identical `list.csv` and `stream.csv`; `checksums.txt` verifies
-including both HTML files.
+E2E: `generate` twice with the same seed yields equal lists; writing both
+packages under distinct parent temp dirs yields byte-identical `list.csv`
+and `stream.csv`; `checksums.txt` verifies including both HTML files.
 
 ### 9.2 `unblinded-report.html` (restricted)
 

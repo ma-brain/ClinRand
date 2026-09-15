@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 
 use clinrand_core::{
     check_properties, stratum_combinations, AllocationRecord, BlockScheme, GeneratedList, Method,
-    NumberingScheme, StudyConfig, ALGO_VERSION,
+    NumberingScheme, StudyConfig, ALGO_VERSION, ENGINE_VERSION,
 };
 
 use crate::manifest::PackageMeta;
@@ -41,10 +41,12 @@ pub struct ReportFileHashes {
 /// Includes study metadata, full config (arms+ratios, not assignments),
 /// per-stratum counts and block structure (canonical stratum order, including
 /// zero-count strata), hashes, engine/algo versions, [`check_properties`]
-/// id/status only (no detail text), and truncation / numbering warnings.
+/// id/status, a static P10 informational policy sentence, and (when the P10
+/// detail contains no config arm codes) the P10 max-run detail. Other property
+/// details are omitted. Also truncation / numbering warnings.
 ///
-/// Does **not** include the seed, any randomization-number↔arm pairing,
-/// per-block arm composition, or raw property-check detail strings.
+/// Does **not** include the seed, any randomization-number↔arm pairing, or
+/// per-block arm composition.
 pub fn render_generation_report(
     cfg: &StudyConfig,
     list: &GeneratedList,
@@ -63,7 +65,12 @@ pub fn render_generation_report(
     push_numbering_warning(&mut body, cfg);
     push_hashes_section(&mut body, hashes);
     push_versions_section(&mut body);
-    push_properties_section(&mut body, &properties, /* include_details */ false);
+    push_properties_section(
+        &mut body,
+        cfg,
+        &properties,
+        /* include_details */ false,
+    );
     push_footer(&mut body);
 
     wrap_html("ClinRand generation report (blinded)", &body)
@@ -91,7 +98,7 @@ pub fn render_unblinded_report(
     push_numbering_warning(&mut body, cfg);
     push_hashes_section(&mut body, hashes);
     push_versions_section(&mut body);
-    push_properties_section(&mut body, &properties, /* include_details */ true);
+    push_properties_section(&mut body, cfg, &properties, /* include_details */ true);
     push_allocation_table(&mut body, cfg, list);
     push_footer(&mut body);
 
@@ -190,19 +197,23 @@ fn push_config_section(out: &mut String, cfg: &StudyConfig) {
 
     let _ = writeln!(out, "<h3>Numbering</h3>");
     let _ = writeln!(out, "<ul>");
+    // start / width / block_size on separate lines so numeric arm codes cannot
+    // share a line with numbering fields (blind-safety false positives).
     match cfg.numbering {
         NumberingScheme::Global { start, width } => {
-            let _ = writeln!(out, "<li>kind=global start={start} width={width}</li>");
+            let _ = writeln!(out, "<li>kind=global</li>");
+            let _ = writeln!(out, "<li>start={start}</li>");
+            let _ = writeln!(out, "<li>width={width}</li>");
         }
         NumberingScheme::PerStratumRange {
             start,
             block_size,
             width,
         } => {
-            let _ = writeln!(
-                out,
-                "<li>kind=per_stratum_range start={start} block_size={block_size} width={width}</li>"
-            );
+            let _ = writeln!(out, "<li>kind=per_stratum_range</li>");
+            let _ = writeln!(out, "<li>start={start}</li>");
+            let _ = writeln!(out, "<li>block_size={block_size}</li>");
+            let _ = writeln!(out, "<li>width={width}</li>");
         }
     }
     let _ = writeln!(
@@ -372,13 +383,12 @@ fn push_hashes_section(out: &mut String, hashes: &ReportFileHashes) {
 }
 
 fn push_versions_section(out: &mut String) {
-    let engine_version = env!("CARGO_PKG_VERSION");
     let _ = writeln!(out, "<h2>Versions</h2>");
     let _ = writeln!(out, "<ul>");
     let _ = writeln!(
         out,
         "<li>engine_version: {}</li>",
-        escape_html(engine_version)
+        escape_html(ENGINE_VERSION)
     );
     let _ = writeln!(out, "<li>algo_version: {ALGO_VERSION}</li>");
     let _ = writeln!(out, "</ul>");
@@ -386,6 +396,7 @@ fn push_versions_section(out: &mut String) {
 
 fn push_properties_section(
     out: &mut String,
+    cfg: &StudyConfig,
     report: &clinrand_core::PropertyReport,
     include_details: bool,
 ) {
@@ -396,6 +407,11 @@ fn push_properties_section(
         "one or more required checks failed"
     };
     let _ = writeln!(out, "<p>{}</p>", escape_html(overall));
+    // Always state P10 policy in both reports: informational, never regenerate.
+    let _ = writeln!(
+        out,
+        "<p>P10 is informational only and must not cause regeneration of a list.</p>"
+    );
     let _ = writeln!(out, "<ul>");
     for check in &report.checks {
         let status = if check.informational {
@@ -409,9 +425,6 @@ fn push_properties_section(
         } else {
             "FAIL"
         };
-        // Blinded report: id + pass/fail (+ informational) only. Full detail
-        // text can name a randomization number and an arm (P03/P04/P09/P10)
-        // and belongs only in the unblinded report.
         let _ = writeln!(
             out,
             "<li>{} {}</li>",
@@ -419,10 +432,47 @@ fn push_properties_section(
             escape_html(status)
         );
         if include_details {
+            // Unblinded: all property details.
+            let _ = writeln!(out, "<li>detail: {}</li>", escape_html(&check.detail));
+        } else if check.id == "P10" && p10_detail_safe_for_blinded(&check.detail, cfg) {
+            // Blinded: P10 max-run detail is distributional (no rand#↔arm).
+            // Omit if detail happens to contain a config arm code token.
             let _ = writeln!(out, "<li>detail: {}</li>", escape_html(&check.detail));
         }
     }
     let _ = writeln!(out, "</ul>");
+}
+
+/// True when `detail` contains no config arm code as a delimiter-aware token.
+fn p10_detail_safe_for_blinded(detail: &str, cfg: &StudyConfig) -> bool {
+    !cfg.arms
+        .iter()
+        .any(|arm| detail_contains_arm_token(detail, &arm.code))
+}
+
+fn detail_contains_arm_token(haystack: &str, code: &str) -> bool {
+    if code.is_empty() {
+        return false;
+    }
+    let bytes = haystack.as_bytes();
+    let code_bytes = code.as_bytes();
+    let mut start = 0;
+    while start + code_bytes.len() <= bytes.len() {
+        if &bytes[start..start + code_bytes.len()] == code_bytes {
+            let before_ok = start == 0 || !is_token_char(bytes[start - 1]);
+            let after = start + code_bytes.len();
+            let after_ok = after == bytes.len() || !is_token_char(bytes[after]);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        start += 1;
+    }
+    false
+}
+
+fn is_token_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
 }
 
 fn push_allocation_table(out: &mut String, cfg: &StudyConfig, list: &GeneratedList) {
