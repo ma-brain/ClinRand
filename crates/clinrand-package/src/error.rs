@@ -2,8 +2,10 @@
 
 use std::fmt;
 
+use crate::canonical::CanonicalError;
+
 /// Failure producing package file bytes.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum PackageError {
     /// An allocation record is missing a stratum factor required by the config.
     MissingStratumFactor {
@@ -12,6 +14,14 @@ pub enum PackageError {
         /// Randomization number of the incomplete record.
         randomization_number: String,
     },
+    /// Canonical JSON or `config_sha256` failed.
+    Canonical(CanonicalError),
+}
+
+impl From<CanonicalError> for PackageError {
+    fn from(err: CanonicalError) -> Self {
+        Self::Canonical(err)
+    }
 }
 
 impl fmt::Display for PackageError {
@@ -24,8 +34,16 @@ impl fmt::Display for PackageError {
                 f,
                 "allocation {randomization_number} is missing stratum factor `{factor}`"
             ),
+            Self::Canonical(err) => write!(f, "{err}"),
         }
     }
 }
 
-impl std::error::Error for PackageError {}
+impl std::error::Error for PackageError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::MissingStratumFactor { .. } => None,
+            Self::Canonical(err) => Some(err),
+        }
+    }
+}

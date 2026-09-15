@@ -10,6 +10,11 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Blinded and unblinded package manifests in `clinrand-package`
+  (`build_manifests`): compact canonical JSON plus trailing `\n`;
+  `list_sha256` / `stream_sha256` digest exact list/stream CSV UTF-8
+  bytes; `seed_sha256` digests raw 32 seed bytes; blinded omits
+  `seed_hex` entirely. `ALGO_VERSION` unchanged (1).
 - `render_list_csv`, `render_list_json`, and `render_stream_csv` in
   `clinrand-package`: in-memory UTF-8 LF emitters for plan §6 list and
   stream files (no filesystem write). Stratum CSV/JSON columns follow

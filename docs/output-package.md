@@ -256,3 +256,43 @@ One row per `StreamDraw` in log order. `purpose` is snake_case:
 | `SimpleAllocation`  | `simple_allocation`  |
 
 An empty stream is the header line plus trailing `\n` only.
+
+---
+
+## 7. Manifests (in-memory)
+
+`build_manifests(&StudyConfig, &GeneratedList, &[u8; 32], &PackageMeta)`
+returns `ManifestPair { unblinded, blinded }` — the UTF-8 contents of
+`manifest.unblinded.json` and `manifest.blinded.json` (plan §6.2–§6.3).
+It does not write the filesystem or read the clock; `PackageMeta`
+supplies `operator` and `generated_at`.
+
+### 7.1 Encoding
+
+- Compact **canonical JSON** (same key-sort rules as §3 / plan §6.4)
+- Exactly one trailing `\n` after the JSON object
+- UTF-8, LF, no BOM
+
+### 7.2 Fields
+
+Shared by both manifests: `schema_version` (`"1.0"`), `study_id`,
+`protocol_version`, `generated_at`, `operator`, `config` (full
+`StudyConfig` wire object), `config_sha256`, `seed_sha256`, `rng`
+(`algorithm` / `crate` / `crate_version`), `engine_version`
+(workspace package version), `algo_version`, `record_count`,
+`list_sha256`, `stream_sha256`.
+
+Unblinded only: `seed_hex` (64 lowercase hex characters of the raw
+32-byte seed). Blinded omits the `seed_hex` **key** entirely; it still
+includes `seed_sha256`.
+
+### 7.3 Content hashes
+
+| Field | Digest input |
+|---|---|
+| `config_sha256` | Canonical JSON of `config` (§4); **no** trailing newline |
+| `seed_sha256` | The **32 raw seed bytes** (not the hex string) |
+| `list_sha256` | Exact UTF-8 bytes of `render_list_csv` (including final `\n`) |
+| `stream_sha256` | Exact UTF-8 bytes of `render_stream_csv` (including final `\n`) |
+
+All digests are SHA-256 encoded as 64 lowercase hex characters.

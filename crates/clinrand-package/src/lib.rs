@@ -9,14 +9,19 @@ mod canonical;
 mod csv_util;
 mod error;
 mod list;
+mod manifest;
 mod stream;
 
 pub use canonical::{
-    canonical_json, canonical_json_value, config_sha256, config_sha256_digest, CanonicalError,
+    canonical_json, canonical_json_value, config_sha256, config_sha256_digest, sha256_hex,
+    CanonicalError,
 };
 pub use clinrand_core::ALGO_VERSION;
 pub use error::PackageError;
 pub use list::{render_list_csv, render_list_json};
+pub use manifest::{
+    build_manifests, seed_hex, seed_sha256, ManifestPair, PackageMeta, MANIFEST_SCHEMA_VERSION,
+};
 pub use stream::render_stream_csv;
 
 #[cfg(test)]

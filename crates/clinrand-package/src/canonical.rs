@@ -76,6 +76,15 @@ pub fn config_sha256_digest(cfg: &StudyConfig) -> Result<[u8; 32], CanonicalErro
     Ok(digest.into())
 }
 
+/// SHA-256 of arbitrary bytes as 64 lowercase hex characters, no `0x` prefix.
+///
+/// Used for `list_sha256` / `stream_sha256` (exact file UTF-8 bytes) and
+/// related content digests.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    to_hex_lowercase(&digest.into())
+}
+
 fn canonicalize_value(value: Value) -> Result<Value, CanonicalError> {
     match value {
         Value::Object(map) => {
@@ -107,7 +116,8 @@ fn canonicalize_value(value: Value) -> Result<Value, CanonicalError> {
 
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
-fn to_hex_lowercase(bytes: &[u8; 32]) -> String {
+/// Encode 32 bytes as 64 lowercase hexadecimal characters.
+pub(crate) fn to_hex_lowercase(bytes: &[u8; 32]) -> String {
     let mut out = String::with_capacity(64);
     for &byte in bytes {
         out.push(char::from(HEX[usize::from(byte >> 4)]));
