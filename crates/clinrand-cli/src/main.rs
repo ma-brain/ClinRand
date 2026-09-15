@@ -10,6 +10,7 @@ mod cli;
 mod commands;
 mod exit;
 mod output;
+mod seed;
 
 use clap::Parser;
 use cli::{Cli, Command};
@@ -18,6 +19,12 @@ use exit::ExitCode;
 use output::{write_stderr, write_stdout};
 
 fn main() {
+    assert_eq!(
+        clinrand_core::ALGO_VERSION,
+        clinrand_package::ALGO_VERSION,
+        "clinrand-core and clinrand-package ALGO_VERSION must match"
+    );
+
     let cli = Cli::parse();
     let code = dispatch(&cli);
     std::process::exit(code.code());
@@ -31,10 +38,15 @@ fn dispatch(cli: &Cli) -> ExitCode {
             config,
             allow_large_strata,
         } => commands::validate_config::run(cli.json, config, *allow_large_strata),
-        Command::Generate { .. }
-        | Command::Reproduce { .. }
-        | Command::Verify { .. }
-        | Command::ValidationReport { .. } => stub_not_implemented(&cli.command),
+        Command::Generate {
+            config,
+            out,
+            operator,
+            allow_large_strata,
+        } => commands::generate::run(cli.json, config, out, operator, *allow_large_strata),
+        Command::Reproduce { .. } | Command::Verify { .. } | Command::ValidationReport { .. } => {
+            stub_not_implemented(&cli.command)
+        }
     }
 }
 

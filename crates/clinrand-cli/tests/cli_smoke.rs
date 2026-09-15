@@ -65,18 +65,6 @@ fn stub_commands_exit_check_failure() {
     for (args, name) in [
         (
             vec![
-                "generate",
-                "--config",
-                "missing.json",
-                "--out",
-                "/tmp/out",
-                "--operator",
-                "Test User",
-            ],
-            "generate",
-        ),
-        (
-            vec![
                 "reproduce",
                 "--manifest",
                 "missing.json",
