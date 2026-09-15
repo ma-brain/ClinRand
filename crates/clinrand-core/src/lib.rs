@@ -18,8 +18,12 @@
 pub const ALGO_VERSION: u32 = 1;
 
 mod rng;
+mod stream;
+mod uniform;
 
 pub use rng::Rng;
+pub use stream::{DrawPurpose, StreamDraw, StreamLog};
+pub use uniform::{uniform_below, U64Draw, UniformError};
 
 #[cfg(test)]
 mod tests {

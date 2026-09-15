@@ -48,6 +48,15 @@ impl Rng {
         self.inner.fill_bytes(dest);
     }
 
+    /// Draw the next 64 bits from the ChaCha20 stream.
+    ///
+    /// Contract-bound: production `uniform_below` consumes randomness
+    /// only through this method. Must not change without an
+    /// `ALGO_VERSION` bump.
+    pub fn next_u64(&mut self) -> u64 {
+        self.inner.next_u64()
+    }
+
     fn position_ietf(&mut self, nonce: [u8; 12], block_counter: u32) {
         let mut stream_bytes = [0u8; 8];
         stream_bytes.copy_from_slice(&nonce[4..12]);
