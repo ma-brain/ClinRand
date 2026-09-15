@@ -152,7 +152,7 @@
           attachLevel(issue, m.match(/^duplicate level (.+?) in factor (.+)$/));
           break;
         case "invalid_level_name":
-          attachLevel(issue, m.match(/^level (.+?) of factor (.+)$/));
+          attachLevel(issue, m.match(/^level (.+?) of factor (.+?) is invalid$/));
           break;
         case "too_many_strata":
         case "stratum_combination_overflow":
@@ -621,6 +621,15 @@
     {/each}
     <button type="button" class="ghost" onclick={addFactor}>Add factor</button>
 
+    {#each mapped.sectionStrata as err (err.code + err.message)}
+      <p class="inline-error">{err.message}</p>
+    {/each}
+  </section>
+{:else if mapped.sectionStrata.length}
+  <!-- Strata section is hidden for non-stratified methods, but strata
+       conflicts (e.g. permuted_block_non_empty_strata) must still be shown. -->
+  <section class="card" aria-labelledby="strata-conflict-heading">
+    <h2 id="strata-conflict-heading">Strata</h2>
     {#each mapped.sectionStrata as err (err.code + err.message)}
       <p class="inline-error">{err.message}</p>
     {/each}
