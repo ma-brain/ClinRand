@@ -7,6 +7,7 @@
 
 mod canonical;
 mod csv_util;
+mod encrypt;
 mod error;
 mod list;
 mod manifest;
@@ -22,6 +23,7 @@ pub use canonical::{
     CanonicalError,
 };
 pub use clinrand_core::{ALGO_VERSION, ENGINE_VERSION, RNG_CRATE_VERSION};
+pub use encrypt::{decrypt_package, write_package_encrypted};
 pub use error::PackageError;
 pub use list::{render_list_csv, render_list_json};
 pub use manifest::{

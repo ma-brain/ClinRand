@@ -408,3 +408,95 @@ and `stream.csv`; `checksums.txt` verifies including both HTML files.
 Same metadata sections, plus full property-check **details** and a full
 allocation table (randomization number ↔ arm). Still never writes the
 seed.
+
+---
+
+## 10. `restricted.age` (plan §6.6, `--encrypt`)
+
+`write_package_encrypted(out_dir, cfg, list, seed, meta, passphrase) ->
+Result<PathBuf, PackageError>` renders the same content as `write_package`
+(§8) but writes only 4 files as plaintext — `generation-report.html`,
+`manifest.blinded.json`, `qc.R`, and `restricted.age` — plus `checksums.txt`
+covering those 4. `list.csv`, `list.json`, `manifest.unblinded.json`,
+`stream.csv`, and `unblinded-report.html` never touch disk as plaintext.
+`decrypt_package(package_dir, passphrase) -> Result<(), PackageError>`
+reverses this **in place**: it writes those 5 files directly into
+`package_dir`, refusing to overwrite any that already exist.
+
+Design rationale, crate choice, and why this is a custom format rather than
+the literal `age` file format: `docs/decisions/0007-restricted-container-format.md`.
+
+### 10.1 Container layout
+
+All multi-byte integers are little-endian.
+
+| Field | Size | Contents |
+|---|---|---|
+| `magic` | 4 bytes | `b"CRV1"` — ClinRand restricted container, format v1 |
+| `kdf_m_cost` | 4 bytes (`u32`) | Argon2id memory cost, KiB |
+| `kdf_t_cost` | 4 bytes (`u32`) | Argon2id iteration count |
+| `kdf_p_cost` | 4 bytes (`u32`) | Argon2id parallelism |
+| `salt` | 16 bytes | Random, unique per encryption |
+| `nonce` | 24 bytes | Random, unique per encryption (XChaCha20 nonce) |
+| `ciphertext` | remainder | AEAD output — plaintext archive (§10.2) + 16-byte Poly1305 tag appended |
+
+Header length is fixed at 56 bytes (`4+4+4+4+16+24`); everything after it is
+ciphertext. New containers always use `m_cost=131072` (128 MiB), `t_cost=3`,
+`p_cost=4`; existing containers with different values (a future retuned
+default) remain decodable because the params travel in the header.
+
+### 10.2 Plaintext archive (pre-encryption)
+
+The AEAD plaintext is a minimal multi-file archive, no external dependency:
+for each of the 5 restricted files, **sorted by filename**, concatenate:
+
+```text
+u16 name_len (LE)  |  name bytes (UTF-8, name_len bytes)
+u64 content_len (LE)  |  content bytes (content_len bytes)
+```
+
+repeated once per file, with no separator or trailing marker — the reader
+stops when it has consumed the whole plaintext. `content` bytes are exactly
+the renderer output for that file (§6, §7, §9.2) — identical to what
+`write_package` would have written as that file's plaintext bytes.
+
+### 10.3 Key derivation and AEAD
+
+- KDF: Argon2id (`argon2` crate), version `0x13`, output length 32 bytes.
+  Input: the UTF-8 passphrase bytes and the container's 16-byte `salt`.
+- AEAD: XChaCha20-Poly1305 (`chacha20poly1305` crate). Key: the 32-byte
+  Argon2id output. Nonce: the container's 24-byte `nonce`.
+- Associated data (authenticated, not encrypted):
+  `"clinrand-restricted-v1:" + study_id + ":" + list_sha256`, where both
+  values are read from the plaintext `manifest.blinded.json` (`study_id`
+  and `list_sha256` top-level fields — both already public in the blinded
+  manifest). This binds a container to its specific package: copying a
+  `restricted.age` from one package directory into another fails AEAD
+  authentication even with the correct passphrase.
+
+### 10.4 `decrypt_package` verification order
+
+1. Read `restricted.age`; compute its SHA-256 and compare against the
+   `restricted.age` line in `checksums.txt`. Mismatch →
+   `PackageError::ContainerCorrupt` (checksum tampering/corruption is
+   distinguished from a wrong passphrase; AEAD is not attempted).
+2. Read `study_id` / `list_sha256` from `manifest.blinded.json` and
+   reconstruct the associated data (§10.3).
+3. Derive the key from the passphrase and the container's `salt` /
+   `kdf_*` fields.
+4. AEAD-decrypt. Failure → `PackageError::DecryptionFailed` (wrong
+   passphrase, or a container substituted from a different package) —
+   the error never states which.
+5. Parse the plaintext archive (§10.2) and write each file into
+   `package_dir`, refusing (`PackageError::RestrictedFileExists`) if any
+   target name already exists.
+
+### 10.5 `checksums.txt` when encrypted
+
+Same GNU `sha256sum` text-mode format as §8.3, but with 4 lines instead of
+8: `generation-report.html`, `manifest.blinded.json`, `qc.R`,
+`restricted.age`. `list.csv` etc. are not listed — their integrity is
+covered transitively through `restricted.age`'s own checksum plus AEAD
+authentication (§10.4), not a separate `checksums.txt` line. After
+`decrypt_package`, `checksums.txt` is left unmodified — it stays a 4-line
+file even though 5 more plaintext files now exist alongside it.

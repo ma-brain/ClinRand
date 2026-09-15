@@ -14,17 +14,32 @@
   let pickerError = $state<string | null>(null);
   let generateError = $state<string | null>(null);
   let outcome = $state<GenerateOutcome | null>(null);
+  let outcomeEncrypted = $state(false);
+
+  let encryptEnabled = $state(false);
+  let passphrase = $state("");
+  let passphraseConfirm = $state("");
 
   let validating = $state(false);
   let validation = $state<ValidationOutcome | null>(null);
   let validateError = $state<string | null>(null);
 
   const operatorTrimmed = $derived(operator.trim());
+  const passphraseMismatch = $derived(
+    encryptEnabled &&
+      passphraseConfirm.length > 0 &&
+      passphrase !== passphraseConfirm,
+  );
+  const passphraseValid = $derived(
+    !encryptEnabled ||
+      (passphrase.length > 0 && passphrase === passphraseConfirm),
+  );
   const canSubmit = $derived(
     !generating &&
       operatorTrimmed.length > 0 &&
       outDir !== null &&
-      validation?.ok === true,
+      validation?.ok === true &&
+      passphraseValid,
   );
 
   let generation = 0;
@@ -98,6 +113,7 @@
     generating = true;
     generateError = null;
     outcome = null;
+    const wasEncrypted = encryptEnabled;
 
     try {
       const result = await invoke<GenerateOutcome>("generate_package", {
@@ -105,14 +121,19 @@
         outDir,
         operator: operatorTrimmed,
         allowLargeStrata,
+        passphrase: wasEncrypted ? passphrase : null,
       });
       outcome = result;
+      outcomeEncrypted = wasEncrypted;
     } catch (err) {
       outcome = null;
       generateError =
         err instanceof Error ? err.message : "Package generation failed.";
     } finally {
       generating = false;
+      // Never leave a passphrase sitting in a JS variable longer than needed.
+      passphrase = "";
+      passphraseConfirm = "";
     }
   }
 
@@ -217,6 +238,48 @@
   </section>
 {/if}
 
+<section class="card" aria-labelledby="encryption-heading">
+  <h2 id="encryption-heading">Encryption at rest</h2>
+  <label class="checkbox">
+    <input type="checkbox" bind:checked={encryptEnabled} disabled={generating} />
+    <span>Encrypt restricted files</span>
+  </label>
+  <p class="section-note">
+    Wraps <code>list.csv</code>, <code>list.json</code>,
+    <code>manifest.unblinded.json</code>, <code>stream.csv</code>, and
+    <code>unblinded-report.html</code> into a single encrypted
+    <code>restricted.age</code> container. No plaintext restricted file is
+    written. You will need this passphrase again to open the unblinded view
+    or run <code>qc.R</code> — there is no recovery if it is lost.
+  </p>
+
+  {#if encryptEnabled}
+    <label>
+      <span>Passphrase</span>
+      <input
+        type="password"
+        bind:value={passphrase}
+        autocomplete="new-password"
+        disabled={generating}
+        required
+      />
+    </label>
+    <label>
+      <span>Confirm passphrase</span>
+      <input
+        type="password"
+        bind:value={passphraseConfirm}
+        autocomplete="new-password"
+        disabled={generating}
+        required
+      />
+    </label>
+    {#if passphraseMismatch}
+      <p class="inline-warning">Passphrases do not match.</p>
+    {/if}
+  {/if}
+</section>
+
 <div class="actions">
   <button
     type="button"
@@ -250,6 +313,16 @@
       <div>
         <dt>Record count</dt>
         <dd>{outcome.record_count}</dd>
+      </div>
+      <div>
+        <dt>Restricted files</dt>
+        <dd>
+          {#if outcomeEncrypted}
+            Encrypted into <code>restricted.age</code>
+          {:else}
+            Plaintext on disk
+          {/if}
+        </dd>
       </div>
     </dl>
 

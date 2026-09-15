@@ -16,8 +16,14 @@ use crate::read::{
 pub struct VerifyReport {
     /// True when every file listed in `checksums.txt` matches its digest.
     pub checksums_ok: bool,
-    /// True when all required property checks (P01–P09) pass.
+    /// True when all required property checks (P01–P09) pass, or trivially
+    /// true when [`Self::properties_checked`] is `false`.
     pub properties_ok: bool,
+    /// False when `list.csv` is absent because the package's restricted
+    /// files are still encrypted in `restricted.age` — property checks need
+    /// the plaintext list and are skipped rather than reported as a failure.
+    /// Run [`crate::decrypt_package`] first to enable them.
+    pub properties_checked: bool,
     /// Human-readable checksum failures (missing file or digest mismatch).
     pub checksum_failures: Vec<String>,
     /// Human-readable required property failures (`Pxx: detail`).
@@ -50,6 +56,11 @@ impl std::fmt::Display for VerifyReport {
 /// from `manifest.unblinded.json` (config field only — seed is not read or used).
 /// Parses `list.csv` and runs [`check_properties`] with an empty stream log.
 ///
+/// If `list.csv` is absent because the package was written with `--encrypt`
+/// and not yet decrypted (`restricted.age` present instead), property checks
+/// are skipped rather than treated as a failure — see
+/// [`VerifyReport::properties_checked`].
+///
 /// # Errors
 ///
 /// I/O failures and parse errors for `checksums.txt`, manifests, or `list.csv`
@@ -60,6 +71,16 @@ pub fn verify_package(package_dir: &Path) -> Result<VerifyReport, PackageError> 
     let cfg = load_config(package_dir)?;
 
     let list_csv_path = package_dir.join("list.csv");
+    if !list_csv_path.is_file() && package_dir.join("restricted.age").is_file() {
+        return Ok(VerifyReport {
+            checksums_ok: checksum_failures.is_empty(),
+            properties_ok: true,
+            properties_checked: false,
+            checksum_failures,
+            property_failures: Vec::new(),
+        });
+    }
+
     let list_csv = fs::read_to_string(&list_csv_path)?;
     let records = parse_list_csv(&cfg, &list_csv)?;
     let list = GeneratedList {
@@ -72,6 +93,7 @@ pub fn verify_package(package_dir: &Path) -> Result<VerifyReport, PackageError> 
     Ok(VerifyReport {
         checksums_ok: checksum_failures.is_empty(),
         properties_ok: property_failures.is_empty(),
+        properties_checked: true,
         checksum_failures,
         property_failures,
     })

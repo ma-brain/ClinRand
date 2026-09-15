@@ -5,14 +5,16 @@ use std::path::Path;
 use chrono::Utc;
 use clinrand_core::{generate_with_options, GenerationError, ValidateOptions, ALGO_VERSION};
 use clinrand_package::{
-    parse_unblinded_manifest, render_list_csv, sha256_hex, write_package, PackageError, PackageMeta,
+    parse_unblinded_manifest, render_list_csv, sha256_hex, write_package, write_package_encrypted,
+    PackageError, PackageMeta,
 };
 
 use crate::exit::ExitCode;
 use crate::output::{write_stderr, write_stdout};
+use crate::passphrase::prompt_new_passphrase;
 
 /// Reproduce a randomization package from `manifest.unblinded.json` into `out_dir`.
-pub fn run(json: bool, manifest_path: &str, out_dir: &str) -> ExitCode {
+pub fn run(json: bool, manifest_path: &str, out_dir: &str, encrypt: bool) -> ExitCode {
     let manifest_text = match std::fs::read_to_string(manifest_path) {
         Ok(text) => text,
         Err(err) => {
@@ -51,6 +53,15 @@ pub fn run(json: bool, manifest_path: &str, out_dir: &str) -> ExitCode {
     if let Err(code) = ensure_out_dir(out_dir) {
         return code;
     }
+
+    let passphrase = if encrypt {
+        match prompt_new_passphrase() {
+            Ok(passphrase) => Some(passphrase),
+            Err(code) => return code,
+        }
+    } else {
+        None
+    };
 
     let options = ValidateOptions {
         allow_large_strata: true,
@@ -93,8 +104,18 @@ pub fn run(json: bool, manifest_path: &str, out_dir: &str) -> ExitCode {
     };
 
     let record_count = u64::try_from(list.records.len()).unwrap_or(u64::MAX);
-    let package_dir = match write_package(Path::new(out_dir), &manifest.config, &list, &seed, &meta)
-    {
+    let package_dir = match &passphrase {
+        Some(passphrase) => write_package_encrypted(
+            Path::new(out_dir),
+            &manifest.config,
+            &list,
+            &seed,
+            &meta,
+            passphrase,
+        ),
+        None => write_package(Path::new(out_dir), &manifest.config, &list, &seed, &meta),
+    };
+    let package_dir = match package_dir {
         Ok(path) => path,
         Err(err) => return emit_package_failure(&err),
     };
@@ -156,7 +177,13 @@ fn emit_package_failure(err: &PackageError) -> ExitCode {
     let message = format!("{err}\n");
     let _ = write_stderr(&message);
     match err {
-        PackageError::Io(_) | PackageError::PackageDirExists { .. } => ExitCode::IoError,
+        PackageError::Io(_)
+        | PackageError::PackageDirExists { .. }
+        | PackageError::RestrictedFileExists { .. } => ExitCode::IoError,
+        PackageError::EmptyPassphrase
+        | PackageError::KeyDerivationFailed
+        | PackageError::DecryptionFailed
+        | PackageError::ContainerCorrupt => ExitCode::PassphraseFailure,
         _ => ExitCode::CheckFailure,
     }
 }

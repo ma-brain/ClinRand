@@ -7,19 +7,24 @@ use clinrand_core::{
     generate_with_options, validate_config, ConfigError, ConfigWarning, GenerationError,
     StudyConfig, ValidateOptions,
 };
-use clinrand_package::{render_list_csv, sha256_hex, write_package, PackageError, PackageMeta};
+use clinrand_package::{
+    render_list_csv, sha256_hex, write_package, write_package_encrypted, PackageError, PackageMeta,
+};
 
 use crate::exit::ExitCode;
 use crate::output::{write_stderr, write_stdout};
+use crate::passphrase::prompt_new_passphrase;
 use crate::seed::draw_seed;
 
 /// Generate a randomization package from `config_path` into `out_dir`.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     json: bool,
     config_path: &str,
     out_dir: &str,
     operator: &str,
     allow_large_strata: bool,
+    encrypt: bool,
 ) -> ExitCode {
     let cfg = match read_config(config_path) {
         Ok(cfg) => cfg,
@@ -35,6 +40,17 @@ pub fn run(
     if let Err(code) = ensure_out_dir(out_dir) {
         return code;
     }
+
+    // Prompt for the passphrase before drawing the seed — never make the
+    // operator confirm a passphrase for a run that will be thrown away.
+    let passphrase = if encrypt {
+        match prompt_new_passphrase() {
+            Ok(passphrase) => Some(passphrase),
+            Err(code) => return code,
+        }
+    } else {
+        None
+    };
 
     let seed = match draw_seed() {
         Ok(seed) => seed,
@@ -65,7 +81,13 @@ pub fn run(
         Err(err) => return emit_package_failure(&err),
     };
 
-    let package_dir = match write_package(Path::new(out_dir), &cfg, &list, &seed, &meta) {
+    let package_dir = match &passphrase {
+        Some(passphrase) => {
+            write_package_encrypted(Path::new(out_dir), &cfg, &list, &seed, &meta, passphrase)
+        }
+        None => write_package(Path::new(out_dir), &cfg, &list, &seed, &meta),
+    };
+    let package_dir = match package_dir {
         Ok(path) => path,
         Err(err) => return emit_package_failure(&err),
     };
@@ -152,7 +174,13 @@ fn emit_package_failure(err: &PackageError) -> ExitCode {
     let message = format!("{err}\n");
     let _ = write_stderr(&message);
     match err {
-        PackageError::Io(_) | PackageError::PackageDirExists { .. } => ExitCode::IoError,
+        PackageError::Io(_)
+        | PackageError::PackageDirExists { .. }
+        | PackageError::RestrictedFileExists { .. } => ExitCode::IoError,
+        PackageError::EmptyPassphrase
+        | PackageError::KeyDerivationFailed
+        | PackageError::DecryptionFailed
+        | PackageError::ContainerCorrupt => ExitCode::PassphraseFailure,
         _ => ExitCode::CheckFailure,
     }
 }

@@ -137,6 +137,26 @@ identifiers as §2.1 confirms the shipped artifact matches the source.
 
 ---
 
+## 3a. Encryption at rest (Phase 8)
+
+`generate_package` accepts an optional `passphrase`; when present, the
+restricted files are written encrypted into `restricted.age` instead of as
+plaintext (plan §6.6, `docs/decisions/0007-restricted-container-format.md`).
+This is entirely local: Argon2id key derivation and XChaCha20-Poly1305
+encryption run in the same Rust process, using no network capability and no
+plugin beyond `dialog`/`fs`. It does not change the posture in §1–§3 — there
+is still no `http`, `shell`, `process`, or `updater` plugin, and the
+passphrase follows the same rule as the seed: never returned to the
+frontend, logged, or included in any error string.
+
+`decrypt_package` writes the 5 restricted files back to disk as plaintext,
+in place, as an explicit operator action — the same trust boundary as an
+unencrypted package from that point on. It is not a security boundary
+against a user with filesystem access to their own machine, the same caveat
+already stated for the unblinded access log in §3.
+
+---
+
 ## 4. What would violate this posture
 
 Any of the following is a regression that must be rejected in review:

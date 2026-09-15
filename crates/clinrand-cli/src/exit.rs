@@ -14,6 +14,9 @@ pub enum ExitCode {
     IoError = 3,
     /// Manifest `algo_version` differs from the binary.
     AlgoVersionMismatch = 4,
+    /// Passphrase confirmation mismatch on `generate --encrypt`, or a wrong
+    /// passphrase / corrupt container on `decrypt`.
+    PassphraseFailure = 5,
 }
 
 impl ExitCode {

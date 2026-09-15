@@ -8,13 +8,24 @@ description = "ClinRand output package reading, writing, hashing, and reports"
 publish = false
 
 [dependencies]
+# XChaCha20-Poly1305 AEAD for the `restricted.age` container (plan §6.6). Exact pin: encryption surface.
+chacha20poly1305 = { version = "=0.11.0", features = ["zeroize"] }
+# Argon2id passphrase KDF for the `restricted.age` container (plan §6.6). Exact pin: encryption surface.
+argon2 = { version = "=0.6.0", features = ["zeroize"] }
 clinrand-core = { path = "../clinrand-core" }
+# OS entropy for the restricted-container salt and nonce only — not the
+# allocation seed. AGENTS.md §3's "getrandom in exactly one place" rule scopes
+# to the determinism-critical seed draw (see clinrand-cli/src/seed.rs); salts
+# and nonces here are non-deterministic by design. Exact pin: entropy surface.
+getrandom = { version = "=0.4.3", features = ["std"] }
 # Deserialize manifest.unblinded.json and embedded StudyConfig. Exact pin: serde surface.
 serde = { version = "=1.0.229", features = ["derive"] }
 # Canonical JSON of StudyConfig for config_sha256 (plan §6.4). Exact pin: hash surface.
 serde_json = "=1.0.151"
 # SHA-256 of canonical config UTF-8 bytes (plan §6.4). Exact pin: hash surface.
 sha2 = "=0.10.9"
+# Wipe the derived container key and passphrase copies from memory after use. Exact pin: secret-hygiene surface.
+zeroize = { version = "=1.9.0", features = ["std"] }
 
 [dev-dependencies]
 # Isolated temp dirs for write_package integration tests only. Exact pin: lock surface.

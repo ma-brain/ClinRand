@@ -79,6 +79,25 @@ pub enum PackageError {
     InvalidSeedHexLength,
     /// `seed_hex` is not lowercase hexadecimal.
     InvalidSeedHexEncoding,
+    /// A passphrase for `--encrypt` / `decrypt` was empty or whitespace-only.
+    EmptyPassphrase,
+    /// Argon2id key derivation failed (invalid parameters or a resource
+    /// failure, e.g. the memory cost could not be allocated).
+    KeyDerivationFailed,
+    /// `restricted.age` failed AEAD authentication: wrong passphrase, or the
+    /// container does not belong to this package. Never reveals which.
+    DecryptionFailed,
+    /// `restricted.age` is structurally invalid: bad magic, truncated
+    /// header, a `checksums.txt` mismatch, or a malformed archive after a
+    /// successful decryption. Distinct from [`Self::DecryptionFailed`] so an
+    /// operator can tell "wrong passphrase" from "this file is damaged".
+    ContainerCorrupt,
+    /// `decrypt` refuses to overwrite a restricted file that already exists
+    /// in the package directory.
+    RestrictedFileExists {
+        /// The file that would have been overwritten.
+        path: std::path::PathBuf,
+    },
 }
 
 impl From<CanonicalError> for PackageError {
@@ -153,6 +172,21 @@ impl fmt::Display for PackageError {
             Self::InvalidSeedHexEncoding => {
                 write!(f, "invalid seed_hex encoding (expected lowercase hex)")
             }
+            Self::EmptyPassphrase => write!(f, "passphrase must not be empty"),
+            Self::KeyDerivationFailed => write!(f, "key derivation failed"),
+            Self::DecryptionFailed => write!(
+                f,
+                "could not decrypt restricted.age (wrong passphrase, or this container does not belong to this package)"
+            ),
+            Self::ContainerCorrupt => write!(
+                f,
+                "restricted.age is corrupt or does not match checksums.txt"
+            ),
+            Self::RestrictedFileExists { path } => write!(
+                f,
+                "refuse to overwrite existing restricted file: {}",
+                path.display()
+            ),
         }
     }
 }
@@ -174,7 +208,12 @@ impl std::error::Error for PackageError {
             | Self::ManifestJsonParse
             | Self::BlindedManifestJsonParse
             | Self::InvalidSeedHexLength
-            | Self::InvalidSeedHexEncoding => None,
+            | Self::InvalidSeedHexEncoding
+            | Self::EmptyPassphrase
+            | Self::KeyDerivationFailed
+            | Self::DecryptionFailed
+            | Self::ContainerCorrupt
+            | Self::RestrictedFileExists { .. } => None,
             Self::Canonical(err) => Some(err),
             Self::Io(err) => Some(err),
         }

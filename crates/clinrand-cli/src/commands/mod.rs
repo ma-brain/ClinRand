@@ -1,5 +1,6 @@
 //! Command implementations (plan §10).
 
+pub mod decrypt;
 pub mod generate;
 pub mod reproduce;
 pub mod validate_config;

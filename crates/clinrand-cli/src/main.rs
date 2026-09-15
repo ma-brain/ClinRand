@@ -10,6 +10,7 @@ mod cli;
 mod commands;
 mod exit;
 mod output;
+mod passphrase;
 mod seed;
 
 use clap::Parser;
@@ -43,8 +44,21 @@ fn dispatch(cli: &Cli) -> ExitCode {
             out,
             operator,
             allow_large_strata,
-        } => commands::generate::run(cli.json, config, out, operator, *allow_large_strata),
-        Command::Reproduce { manifest, out } => commands::reproduce::run(cli.json, manifest, out),
+            encrypt,
+        } => commands::generate::run(
+            cli.json,
+            config,
+            out,
+            operator,
+            *allow_large_strata,
+            *encrypt,
+        ),
+        Command::Reproduce {
+            manifest,
+            out,
+            encrypt,
+        } => commands::reproduce::run(cli.json, manifest, out, *encrypt),
+        Command::Decrypt { package } => commands::decrypt::run(cli.json, package),
         Command::Verify { package } => commands::verify::run(cli.json, package),
         Command::ValidationReport { tier, format } => {
             commands::validation_report::run(cli.json, tier.as_deref(), format.as_deref())

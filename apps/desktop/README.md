@@ -78,15 +78,22 @@ sequence through the actual UI.
 3. **Generate** — enter an operator name, pick a destination folder via the OS
    dialog, accept the confirmation that the output contains unblinded material,
    and generate. The screen shows the package path and `list_sha256`. The seed
-   is never displayed. (There is no encryption control — deferred to Phase 8.)
+   is never displayed. Optionally check "Encrypt restricted files" and enter a
+   passphrase twice — the result panel then shows `restricted.age` in place of
+   the plaintext restricted files (plan §6.6).
 4. **Package viewer** — open the generated package, run verify (expect
-   checksums + properties PASS), and read the inline blinded report. The
-   blinded report never pairs a randomization number with an arm.
+   checksums + properties PASS — or, for an encrypted package not yet
+   decrypted, checksums PASS with a "properties not checked" note), and read
+   the inline blinded report. The blinded report never pairs a randomization
+   number with an arm.
 5. **Unblinded view** *(optional)* — reachable only after an explicit
    confirmation dialog. Opening it appends a timestamped line to
    `access-log.txt` inside the package directory. This access log is a UI-side
    audit convenience, not a security boundary (see
-   [`docs/security-posture.md`](../../docs/security-posture.md) §3).
+   [`docs/security-posture.md`](../../docs/security-posture.md) §3). For an
+   encrypted package, a passphrase prompt appears after the access-log entry
+   is written and before any content is decrypted or shown; a correct
+   passphrase decrypts the restricted files in place and reveals the report.
 6. **Validation** — run each tier and confirm the evidential status is
    labelled: reference = correctness vs. an external source; properties =
    invariants only; regression = consistency only (never correctness).
