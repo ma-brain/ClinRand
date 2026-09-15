@@ -17,3 +17,4 @@ is never changed as a side effect of another change.
   `validation/reference/chacha20/`.
 - `uniform_below` rejection sampling, `StreamLog` recording, and
   hand-worked cases under `validation/reference/uniform-below/`.
+- `docs/determinism.md` — normative RNG-layer contract (plan §2.1–2.6).
