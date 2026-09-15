@@ -61,21 +61,15 @@ fn list_methods_json_prints_array() {
 }
 
 #[test]
-fn validation_report_stub_exits_check_failure() {
+fn validation_report_default_exits_success() {
     let output = clinrand()
         .arg("validation-report")
         .output()
         .expect("run clinrand validation-report");
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "validation-report should exit 1, stderr: {}",
-        stderr(&output)
-    );
-    let err = stderr(&output);
     assert!(
-        err.contains("not yet implemented"),
-        "validation-report stderr: {err}"
+        output.status.success(),
+        "validation-report should exit 0, stderr: {}",
+        stderr(&output)
     );
 }
 

@@ -16,7 +16,7 @@ use clap::Parser;
 use cli::{Cli, Command};
 use clinrand_core::{ALGO_VERSION, ENGINE_VERSION};
 use exit::ExitCode;
-use output::{write_stderr, write_stdout};
+use output::write_stdout;
 
 fn main() {
     assert_eq!(
@@ -46,7 +46,9 @@ fn dispatch(cli: &Cli) -> ExitCode {
         } => commands::generate::run(cli.json, config, out, operator, *allow_large_strata),
         Command::Reproduce { manifest, out } => commands::reproduce::run(cli.json, manifest, out),
         Command::Verify { package } => commands::verify::run(cli.json, package),
-        Command::ValidationReport { .. } => stub_not_implemented(&cli.command),
+        Command::ValidationReport { tier, format } => {
+            commands::validation_report::run(cli.json, tier.as_deref(), format.as_deref())
+        }
     }
 }
 
@@ -85,21 +87,3 @@ fn run_list_methods(json: bool) -> ExitCode {
     ExitCode::Success
 }
 
-fn stub_not_implemented(command: &Command) -> ExitCode {
-    let name = command_name(command);
-    let message = format!("clinrand {name}: not yet implemented\n");
-    let _ = write_stderr(&message);
-    ExitCode::CheckFailure
-}
-
-fn command_name(command: &Command) -> &'static str {
-    match command {
-        Command::ListMethods => "list-methods",
-        Command::ValidateConfig { .. } => "validate-config",
-        Command::Generate { .. } => "generate",
-        Command::Reproduce { .. } => "reproduce",
-        Command::Verify { .. } => "verify",
-        Command::ValidationReport { .. } => "validation-report",
-        Command::Version => "version",
-    }
-}
