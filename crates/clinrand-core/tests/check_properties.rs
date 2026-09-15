@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use clinrand_core::{
-    check_properties, generate, AllocationRecord, Arm, BlockScheme, GeneratedList, Method,
-    NumberingScheme, StratificationFactor, StreamLog, StudyConfig,
+    check_properties, generate, AllocationRecord, Arm, BlockScheme, ConfigError, GeneratedList,
+    GenerationError, Method, NumberingScheme, StratificationFactor, StreamLog, StudyConfig,
 };
 
 fn seed_a() -> [u8; 32] {
@@ -221,8 +221,8 @@ fn p04_fails_on_duplicate_randomization_numbers() {
 }
 
 #[test]
-fn overlapping_per_stratum_range_generates_list_that_fails_p04() {
-    // Decision 0006 / plan §5.6: validate does not reject overlap; P04 catches it.
+fn overlapping_per_stratum_range_is_rejected_by_validate_config() {
+    // Decision 0006 / plan §5.2: block_size < list_length_per_stratum rejects.
     let cfg = StudyConfig {
         schema_version: "1.0".into(),
         study_id: "DEMO-406".into(),
@@ -238,12 +238,26 @@ fn overlapping_per_stratum_range_generates_list_that_fails_p04() {
         list_length_per_stratum: 10,
         numbering: NumberingScheme::PerStratumRange {
             start: 1,
-            block_size: 5, // < length → stratum ranges overlap
+            block_size: 5, // < length → reserved ranges would overlap
             width: 4,
         },
     };
-    let list = generate(&cfg, seed_a()).expect("overlap is not a generate reject");
-    assert_check_fails(&list, &cfg, "P04");
+    let err = generate(&cfg, seed_a()).expect_err("overlap must fail validate inside generate");
+    match err {
+        GenerationError::InvalidConfig(errs) => {
+            assert!(
+                errs.iter().any(|e| matches!(
+                    e,
+                    ConfigError::PerStratumRangeTooSmall {
+                        block_size: 5,
+                        list_length: 10
+                    }
+                )),
+                "missing PerStratumRangeTooSmall in {errs:?}"
+            );
+        }
+        other => panic!("expected InvalidConfig, got {other:?}"),
+    }
 }
 
 #[test]

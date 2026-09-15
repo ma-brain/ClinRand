@@ -19,8 +19,7 @@ is never changed as a side effect of another change.
   checks P01–P10. P10 is informational only and never fails. P03/P08 exempt
   only truncated final blocks per stratum; non-final under-full blocks fail.
   Simple size-1 blocks skip ratio-bearing P03/P09 rules. P09 uses integer
-  one-block tolerance for block methods. Overlapping `per_stratum_range`
-  is not a validate reject (decision 0006); P04 detects duplicate numbers.
+  one-block tolerance for block methods.
 - `generate` in `clinrand-core` for `simple`, `permuted_block`, and
   `stratified_block`: block truncation (§5.5), global and
   `per_stratum_range` numbering (§5.6), one shared RNG/stream per run.
@@ -55,6 +54,9 @@ is never changed as a side effect of another change.
 
 ### Changed
 
+- Plan §5.2 and `validate_config` reject `per_stratum_range` when
+  `block_size < list_length_per_stratum` (`ConfigError::PerStratumRangeTooSmall`).
+  Disclosure remains a warning. Decision 0006 updated.
 - `validate_config` rejects block size `0` (`ConfigError::BlockSizeZero`)
   for fixed `size` and any entry in variable `sizes`. Size `0` is a
   multiple of every ratio sum (`0 % n == 0`) and was previously accepted.

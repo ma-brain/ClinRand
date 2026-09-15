@@ -420,6 +420,41 @@ fn per_stratum_range_is_accepted_with_disclosure_warning() {
 }
 
 #[test]
+fn rejects_per_stratum_range_when_block_size_smaller_than_list_length() {
+    let mut cfg = valid_stratified();
+    cfg.list_length_per_stratum = 36;
+    cfg.numbering = NumberingScheme::PerStratumRange {
+        start: 20001,
+        block_size: 20,
+        width: 5,
+    };
+    let errs = validate(&cfg).expect_err("overlapping ranges must reject");
+    assert!(
+        errs.iter().any(|e| matches!(
+            e,
+            ConfigError::PerStratumRangeTooSmall {
+                block_size: 20,
+                list_length: 36
+            }
+        )),
+        "missing PerStratumRangeTooSmall in {errs:?}"
+    );
+}
+
+#[test]
+fn accepts_per_stratum_range_when_block_size_equals_list_length() {
+    let mut cfg = valid_stratified();
+    cfg.list_length_per_stratum = 36;
+    cfg.numbering = NumberingScheme::PerStratumRange {
+        start: 20001,
+        block_size: 36,
+        width: 5,
+    };
+    let warnings = validate(&cfg).expect("equal range size is non-overlapping");
+    assert_eq!(warnings, vec![ConfigWarning::PerStratumRangeDisclosure]);
+}
+
+#[test]
 fn collects_all_errors_rather_than_stopping_at_the_first() {
     let mut cfg = valid_stratified();
     cfg.arms = vec![Arm {

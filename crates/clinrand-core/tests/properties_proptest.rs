@@ -96,7 +96,7 @@ fn arb_list_length() -> impl Strategy<Value = u32> {
 fn arb_numbering(list_length: u32) -> impl Strategy<Value = NumberingScheme> {
     let global =
         (1u32..=1000, 1u8..=8).prop_map(|(start, width)| NumberingScheme::Global { start, width });
-    // Range size must cover the per-stratum list so numbers never collide (P04).
+    // §5.2: block_size must be >= list_length_per_stratum (non-overlapping ranges).
     let range_block = list_length.max(1);
     let per_stratum =
         (1u32..=1000, Just(range_block), 1u8..=8).prop_map(|(start, block_size, width)| {
