@@ -6,3 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "Deterministic clinical-trial randomization engine"
 publish = false
+
+[dependencies]
+# Exact pin: allocation-path RNG. Bernstein 64-bit counter / 64-bit stream.
+rand_chacha = "=0.3.1"
+# Version required by rand_chacha 0.3.1; RngCore / SeedableRng only.
+rand_core = "=0.6.4"

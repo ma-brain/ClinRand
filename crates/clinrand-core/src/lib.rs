@@ -17,6 +17,10 @@
 /// regression fixture set. See plan §2.6.
 pub const ALGO_VERSION: u32 = 1;
 
+mod rng;
+
+pub use rng::Rng;
+
 #[cfg(test)]
 mod tests {
     use super::ALGO_VERSION;
