@@ -5,7 +5,7 @@ This document specifies how ClinRand produces **canonical JSON**,
 `stream.csv`** byte layouts, **manifests**, **HTML reports**, and the
 **`write_package`** filesystem layout including **`checksums.txt`**.
 Canonical JSON is precise enough for an independent reimplementation
-of the config hash. `qc.R` remains out of scope here (Phase 6).
+of the config hash. `qc.R` emission is specified in §8.
 
 A third party who follows this file, without reading the Rust sources,
 must obtain the same canonical bytes and the same SHA-256 for a given
@@ -309,8 +309,8 @@ All digests are SHA-256 encoded as 64 lowercase hex characters.
 ## 8. `write_package` and `checksums.txt`
 
 `write_package(out_dir, cfg, list, seed, meta) -> Result<PathBuf, PackageError>`
-creates a package directory and writes the Phase 4 file set (no `qc.R`),
-including both HTML reports. If the target package directory already
+creates a package directory and writes the full package file set,
+including both HTML reports and `qc.R`. If the target package directory already
 exists, `write_package` returns [`PackageError::PackageDirExists`] and
 does not overwrite.
 
@@ -338,6 +338,7 @@ first 8 characters.
 | `manifest.blinded.json` | `ManifestPair.blinded` from `build_manifests` |
 | `generation-report.html` | `render_generation_report` |
 | `unblinded-report.html` | `render_unblinded_report` |
+| `qc.R` | `render_qc_r` |
 | `checksums.txt` | See §8.3 |
 
 Manifests are written as the exact `ManifestPair` strings — they are
@@ -347,7 +348,8 @@ Manifests are written as the exact `ManifestPair` strings — they are
 ### 8.3 `checksums.txt`
 
 SHA-256 of every package file **except** `checksums.txt` itself
-(including both HTML reports). Format is GNU `sha256sum` **text mode**:
+(including both HTML reports and `qc.R`). Format is GNU `sha256sum`
+**text mode**:
 one line per file
 
 ```text

@@ -40,6 +40,7 @@ const PACKAGE_FILES: &[&str] = &[
     "list.json",
     "manifest.blinded.json",
     "manifest.unblinded.json",
+    "qc.R",
     "stream.csv",
     "unblinded-report.html",
 ];

@@ -10,7 +10,7 @@ criteria are met.
 - [x] Phase 3 — Generation engine (simple / permuted-block / stratified-block, numbering, P01–P10, proptest)
 - [x] Phase 4 — Package writer (`list.csv`, manifests, reports, checksums, blind-safety test)
 - [x] Phase 5 — CLI (`generate`, `reproduce`, `verify`, `validation-report`, exit codes)
-- [ ] Phase 6 — Emitted `qc.R` and `docs/qc-procedure.md`
+- [x] Phase 6 — Emitted `qc.R` and `docs/qc-procedure.md`
 - [ ] Phase 7 — Desktop application (Tauri 2 + SvelteKit, capability lock-down, `docs/security-posture.md`)
 - [ ] Phase 8 — Encryption at rest and tagged release installers
 - [ ] Phase 9 — Validation completeness (`validation/README.md`, regression rules, handbook)

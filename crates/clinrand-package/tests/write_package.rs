@@ -15,7 +15,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use clinrand_package::{
-    build_manifests, compact_generated_at, render_list_csv, sha256_hex, write_package, PackageMeta,
+    build_manifests, compact_generated_at, render_list_csv, render_qc_r, sha256_hex, write_package,
+    PackageMeta,
 };
 
 fn arms_ap() -> Vec<Arm> {
@@ -97,7 +98,7 @@ fn demo_seed() -> [u8; 32] {
     seed
 }
 
-fn expected_filenames() -> [&'static str; 8] {
+fn expected_filenames() -> [&'static str; 9] {
     [
         "checksums.txt",
         "generation-report.html",
@@ -105,6 +106,7 @@ fn expected_filenames() -> [&'static str; 8] {
         "list.json",
         "manifest.blinded.json",
         "manifest.unblinded.json",
+        "qc.R",
         "stream.csv",
         "unblinded-report.html",
     ]
@@ -140,10 +142,13 @@ fn write_package_creates_expected_filenames_and_dir_name() {
     names.sort();
     assert_eq!(names, expected_filenames());
 
-    // qc.R is Phase 6; HTML reports are present (Task 5).
-    assert!(!package_dir.join("qc.R").exists());
+    assert!(package_dir.join("qc.R").is_file());
     assert!(package_dir.join("generation-report.html").is_file());
     assert!(package_dir.join("unblinded-report.html").is_file());
+
+    let qc_on_disk = fs::read_to_string(package_dir.join("qc.R")).expect("qc.R");
+    let qc_expected = render_qc_r(&cfg).expect("render_qc_r");
+    assert_eq!(qc_on_disk, qc_expected);
 }
 
 #[test]
