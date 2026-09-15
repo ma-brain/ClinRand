@@ -1,41 +1,45 @@
 //! Filesystem package writer and `checksums.txt` (plan §6).
 //!
-//! Writes exact bytes from the list/stream renderers and
-//! [`crate::build_manifests`]; does not re-serialize manifests.
-//! Does not emit `qc.R`, HTML reports, or encrypted containers.
+//! Writes exact bytes from the list/stream renderers,
+//! [`crate::build_manifests`], and HTML report renderers. Does not
+//! re-serialize manifests. Does not emit `qc.R` or encrypted containers.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use clinrand_core::{GeneratedList, StudyConfig};
 
-use crate::canonical::sha256_hex;
+use crate::canonical::{config_sha256, sha256_hex};
 use crate::error::PackageError;
 use crate::list::{render_list_csv, render_list_json};
-use crate::manifest::{build_manifests, PackageMeta};
+use crate::manifest::{build_manifests, seed_sha256, PackageMeta};
+use crate::report::{render_generation_report, render_unblinded_report, ReportFileHashes};
 use crate::stream::render_stream_csv;
 
 /// Filenames written into a package directory (excluding `checksums.txt`).
 ///
 /// Sorted lexicographically — this is also the `checksums.txt` line order.
 const PACKAGE_FILES: &[&str] = &[
+    "generation-report.html",
     "list.csv",
     "list.json",
     "manifest.blinded.json",
     "manifest.unblinded.json",
     "stream.csv",
+    "unblinded-report.html",
 ];
 
 /// Write a ClinRand output package under `out_dir`.
 ///
 /// Creates
 /// `<out_dir>/<study_id>_<generated_at compact>_<first 8 hex of list_sha256>/`
-/// containing `list.csv`, `list.json`, `stream.csv`, both manifests, and
-/// `checksums.txt`. Does not write `qc.R` or HTML reports.
+/// containing `list.csv`, `list.json`, `stream.csv`, both manifests, both HTML
+/// reports, and `checksums.txt`. Does not write `qc.R`.
 ///
 /// Manifest file bytes are exactly those returned by [`build_manifests`].
 /// `list.csv` / `list.json` / `stream.csv` are exactly the renderer outputs.
-/// The seed appears only in `manifest.unblinded.json` on disk.
+/// HTML reports are exactly the report-renderer outputs. The seed appears only
+/// in `manifest.unblinded.json` on disk (never in the blinded report).
 ///
 /// # Errors
 ///
@@ -55,6 +59,19 @@ pub fn write_package(
     let manifests = build_manifests(cfg, list, seed, meta)?;
 
     let list_sha256 = sha256_hex(list_csv.as_bytes());
+    let hashes = ReportFileHashes {
+        list_sha256: list_sha256.clone(),
+        list_json_sha256: sha256_hex(list_json.as_bytes()),
+        stream_sha256: sha256_hex(stream_csv.as_bytes()),
+        manifest_blinded_sha256: sha256_hex(manifests.blinded.as_bytes()),
+        manifest_unblinded_sha256: sha256_hex(manifests.unblinded.as_bytes()),
+        config_sha256: config_sha256(cfg).map_err(PackageError::from)?,
+        seed_sha256: seed_sha256(seed),
+    };
+
+    let generation_report = render_generation_report(cfg, list, meta, &hashes);
+    let unblinded_report = render_unblinded_report(cfg, list, meta, &hashes);
+
     let dir_name = format!(
         "{}_{}_{}",
         cfg.study_id,
@@ -65,12 +82,14 @@ pub fn write_package(
 
     fs::create_dir_all(&package_dir).map_err(PackageError::from)?;
 
-    let contents: [(&str, &[u8]); 5] = [
+    let contents: [(&str, &[u8]); 7] = [
+        ("generation-report.html", generation_report.as_bytes()),
         ("list.csv", list_csv.as_bytes()),
         ("list.json", list_json.as_bytes()),
         ("manifest.blinded.json", manifests.blinded.as_bytes()),
         ("manifest.unblinded.json", manifests.unblinded.as_bytes()),
         ("stream.csv", stream_csv.as_bytes()),
+        ("unblinded-report.html", unblinded_report.as_bytes()),
     ];
 
     for &(name, bytes) in &contents {
@@ -141,6 +160,8 @@ mod tests {
             ("list.json", b"j\n"),
             ("manifest.unblinded.json", b"u\n"),
             ("manifest.blinded.json", b"b\n"),
+            ("generation-report.html", b"g\n"),
+            ("unblinded-report.html", b"ub\n"),
         ]);
         let names: Vec<&str> = body
             .lines()

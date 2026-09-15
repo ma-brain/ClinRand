@@ -10,12 +10,20 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Blinded `generation-report.html` and restricted `unblinded-report.html`
+  in `clinrand-package` (`render_generation_report` /
+  `render_unblinded_report`), integrated into `write_package` so
+  `checksums.txt` covers both HTML files. Property results come from
+  `check_properties`. Mandatory blind-safety CI test: no line of the
+  blinded report may contain both a randomization number and an arm
+  code; seed hex absent. No templating crate. `ALGO_VERSION` unchanged
+  (1).
 - `write_package` in `clinrand-package`: writes
   `<study_id>_<compact generated_at>_<list_sha256[:8]>/` with
   `list.csv` / `list.json` / `stream.csv`, both manifests (exact
-  `ManifestPair` bytes), and `checksums.txt` (GNU `sha256sum` text
-  mode, sorted by filename, excluding itself). No `qc.R` or HTML.
-  `ALGO_VERSION` unchanged (1).
+  `ManifestPair` bytes), both HTML reports, and `checksums.txt` (GNU
+  `sha256sum` text mode, sorted by filename, excluding itself). No
+  `qc.R`. `ALGO_VERSION` unchanged (1).
 - Blinded and unblinded package manifests in `clinrand-package`
   (`build_manifests`): compact canonical JSON plus trailing `\n`;
   `list_sha256` / `stream_sha256` digest exact list/stream CSV UTF-8

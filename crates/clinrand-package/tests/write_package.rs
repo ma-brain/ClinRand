@@ -97,14 +97,16 @@ fn demo_seed() -> [u8; 32] {
     seed
 }
 
-fn expected_filenames() -> [&'static str; 6] {
+fn expected_filenames() -> [&'static str; 8] {
     [
         "checksums.txt",
+        "generation-report.html",
         "list.csv",
         "list.json",
         "manifest.blinded.json",
         "manifest.unblinded.json",
         "stream.csv",
+        "unblinded-report.html",
     ]
 }
 
@@ -138,10 +140,10 @@ fn write_package_creates_expected_filenames_and_dir_name() {
     names.sort();
     assert_eq!(names, expected_filenames());
 
-    // No HTML / qc.R in Phase 4.
+    // qc.R is Phase 6; HTML reports are present (Task 5).
     assert!(!package_dir.join("qc.R").exists());
-    assert!(!package_dir.join("generation-report.html").exists());
-    assert!(!package_dir.join("unblinded-report.html").exists());
+    assert!(package_dir.join("generation-report.html").is_file());
+    assert!(package_dir.join("unblinded-report.html").is_file());
 }
 
 #[test]
