@@ -21,8 +21,9 @@
 #   Base R plus jsonlite and digest only. No other packages are permitted.
 #
 # THE SEED
-#   This script never prints the seed. It has no need for seed_hex and does not
-#   read it. Do not add code that cats or logs any seed material.
+#   The manifest is loaded via fromJSON (which may include seed_hex), but this
+#   script never accesses, prints, or logs the seed / seed_hex. Do not add code
+#   that cats or logs any seed material.
 #
 # ---------------------------------------------------------------------------
 # Study-specific header (interpolated by clinrand-package::render_qc_r). These

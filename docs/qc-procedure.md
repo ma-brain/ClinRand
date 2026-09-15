@@ -20,8 +20,10 @@ Install the two packages once on the QC machine:
 install.packages(c("jsonlite", "digest"))
 ```
 
-CI and the integration tests use the same dependency set. Do not add packages
-to `qc.R`; a locked-down validated R installation must be able to run it.
+CI and the integration tests use the same dependency set. Workspace
+`just test` / `cargo test --workspace` also require R with these packages
+(the `qc_r` tests invoke `Rscript`). Do not add packages to `qc.R`; a
+locked-down validated R installation must be able to run it.
 
 ## How to run
 
@@ -129,7 +131,8 @@ change regression fixture hashes or bump `ALGO_VERSION` without following
 The seed is equivalent to the list. Anyone with `seed_hex` from
 `manifest.unblinded.json` can reproduce the allocation.
 
-- **`qc.R` never prints the seed.** It does not read or log `seed_hex`.
+- **`qc.R` never prints or logs the seed.** It may load the full unblinded
+  manifest via `fromJSON` but never accesses, prints, or logs `seed_hex`.
 - Treat **`manifest.unblinded.json`** like the list: store it securely,
   restrict access to unblinded staff, and do not commit it to version
   control or paste it into tickets.
