@@ -10,6 +10,11 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Canonical JSON and `config_sha256` in `clinrand-package` (plan §6.4):
+  object keys sorted by UTF-8 byte order, compact encoding, SHA-256 of
+  those UTF-8 bytes as lowercase hex. Documented in
+  `docs/output-package.md`. Plan §4 sketched `canonical_json` on
+  `clinrand-core`; hashing stays in the package crate.
 - Published study-config JSON Schema at `docs/schema/study-config-1.0.json`
   and synthetic configs under `examples/` (wire format, plan §5.1).
 - `validate_config` in `clinrand-core` with every plan §5.2 reject
