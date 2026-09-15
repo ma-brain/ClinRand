@@ -10,6 +10,47 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 4 final-review hardenings: `write_package` refuses overwrite of an
+  existing package directory; E2E calls `generate` twice then writes under
+  distinct parent dirs and asserts equal lists plus byte-identical
+  `list.csv` / `stream.csv`; manifests/reports take
+  `clinrand_core::ENGINE_VERSION` and `RNG_CRATE_VERSION`; blinded report
+  states P10 must not cause regeneration and includes arm-code-safe P10
+  max-run detail. `PackageMeta::new` / `build_manifests` validate
+  `generated_at` as `YYYY-MM-DDTHH:MM:SSZ`. `ALGO_VERSION` unchanged (1).
+- Phase 4 package writer complete: `write_package` E2E invariant that two
+  runs with the same `(config, seed, meta)` produce byte-identical
+  `list.csv` / `stream.csv`, with `checksums.txt` verifying HTML-inclusive
+  digests. Phase 4 ticked in `TODO.md`. `ALGO_VERSION` unchanged (1).
+- Blinded `generation-report.html` and restricted `unblinded-report.html`
+  in `clinrand-package` (`render_generation_report` /
+  `render_unblinded_report`), integrated into `write_package` so
+  `checksums.txt` covers both HTML files. Property results come from
+  `check_properties`. Blinded report emits check id + pass/fail
+  (+ informational), a P10 no-regeneration policy sentence, and safe P10
+  max-run detail; other `PropertyCheck.detail` text is unblinded-only.
+  Per-stratum counts/blocks follow canonical `stratum_combinations`
+  order (including zeros). Mandatory blind-safety CI test on a real
+  `generate()` DEMO list with delimiter-aware pairing and an unblinded
+  negative control; seed hex absent. No templating crate. `ALGO_VERSION`
+  unchanged (1).
+- `write_package` in `clinrand-package`: writes
+  `<study_id>_<compact generated_at>_<list_sha256[:8]>/` with
+  `list.csv` / `list.json` / `stream.csv`, both manifests (exact
+  `ManifestPair` bytes), both HTML reports, and `checksums.txt` (GNU
+  `sha256sum` text mode, sorted by filename, excluding itself). No
+  `qc.R`. `ALGO_VERSION` unchanged (1).
+- Blinded and unblinded package manifests in `clinrand-package`
+  (`build_manifests`): compact canonical JSON plus trailing `\n`;
+  `list_sha256` / `stream_sha256` digest exact list/stream CSV UTF-8
+  bytes; `seed_sha256` digests raw 32 seed bytes; blinded omits
+  `seed_hex` entirely. `ALGO_VERSION` unchanged (1).
+- `render_list_csv`, `render_list_json`, and `render_stream_csv` in
+  `clinrand-package`: in-memory UTF-8 LF emitters for plan §6 list and
+  stream files (no filesystem write). Stratum CSV/JSON columns follow
+  config factor order; trailing newline policy documented in
+  `docs/output-package.md`. No seed in these outputs. `ALGO_VERSION`
+  unchanged (1).
 - Property suite (`proptest`, 1000 cases) and named determinism tests in
   `clinrand-core`: arbitrary valid configs must satisfy P01–P09 via
   `all_required_passed`, and `generate` is byte-stable under a fixed seed

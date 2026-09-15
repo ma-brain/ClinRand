@@ -1,11 +1,11 @@
-# Output package — canonical JSON and config hashing
+# Output package — canonical JSON, hashing, and list/stream renderers
 
-This document specifies how ClinRand produces **canonical JSON** and
-**`config_sha256`**. It is precise enough for an independent
-reimplementation of the hash. The rest of the output package (file list,
-`list.csv`, reports, manifests) is defined in
-[`docs/plans/clinrand-implementation-plan.md`](plans/clinrand-implementation-plan.md)
-§6 and is documented here in a later phase.
+This document specifies how ClinRand produces **canonical JSON**,
+**`config_sha256`**, in-memory **`list.csv` / `list.json` /
+`stream.csv`** byte layouts, **manifests**, **HTML reports**, and the
+**`write_package`** filesystem layout including **`checksums.txt`**.
+Canonical JSON is precise enough for an independent reimplementation
+of the config hash. `qc.R` remains out of scope here (Phase 6).
 
 A third party who follows this file, without reading the Rust sources,
 must obtain the same canonical bytes and the same SHA-256 for a given
@@ -35,6 +35,10 @@ Public API:
   no `0x` prefix
 - `config_sha256_digest(&StudyConfig) -> Result<[u8; 32], CanonicalError>` —
   the same digest as raw bytes
+- `render_list_csv` / `render_list_json` / `render_stream_csv` — see §6
+- `build_manifests` — see §7
+- `write_package` / `compact_generated_at` — see §8
+- `render_generation_report` / `render_unblinded_report` — see §9
 
 `ALGO_VERSION` is not involved. Changing canonicalization changes
 hashes in the package; it does not change the allocation stream.
@@ -182,3 +186,223 @@ Notes on that line:
 
 The same logical config with every object’s keys reversed must produce
 this exact string and this exact hex digest.
+
+---
+
+## 6. `list.csv`, `list.json`, and `stream.csv` (in-memory)
+
+These renderers live in `clinrand-package` and are pure functions of
+`GeneratedList` / `StreamLog` plus `StudyConfig` where needed. They do
+**not** write the filesystem, do **not** include the seed, and do **not**
+implement allocation.
+
+Public API:
+
+- `render_list_csv(&StudyConfig, &GeneratedList) -> Result<String, PackageError>`
+- `render_list_json(&StudyConfig, &GeneratedList) -> Result<String, PackageError>`
+- `render_stream_csv(&StreamLog) -> Result<String, PackageError>`
+
+### 6.1 Shared encoding
+
+- UTF-8 text, **LF** (`\n`) line endings, **no BOM**
+- Each file ends with **exactly one trailing `\n`** after the last row
+  (or after the header when there are no data rows). There is no extra
+  blank line.
+- CSV quoting is minimal RFC 4180-style: quote a field only if it
+  contains comma, `"`, or a newline; escape `"` as `""`. Synthetic
+  fixtures normally need no quotes.
+
+SHA-256 of these files (when manifests hash them) is the digest of these
+exact UTF-8 bytes, including the final newline.
+
+### 6.2 `list.csv` (plan §6.1)
+
+Header, then one row per `AllocationRecord` in list order:
+
+```text
+randomization_number,<one column per stratum factor>,block_id,block_size,position_in_block,arm_code
+```
+
+Stratum columns follow **config factor order** (`StudyConfig.strata`).
+Do not sort factor names. Empty `strata` → no stratum columns between
+`randomization_number` and `block_id`.
+
+### 6.3 `list.json`
+
+Structured equivalent of the same rows:
+
+```text
+{"records":[{...},{...}]}
+```
+
+plus a trailing `\n`. Each record object uses the **same keys as the
+CSV columns**, emitted in that same order (config factor order for
+stratum fields). Compact encoding: no insignificant whitespace. Keys are
+not lexicographically sorted (unlike §6.4 canonical JSON), so that
+stratum field order matches the CSV.
+
+### 6.4 `stream.csv`
+
+Header and columns:
+
+```text
+index,bound,value,purpose
+```
+
+One row per `StreamDraw` in log order. `purpose` is snake_case:
+
+| `DrawPurpose`       | CSV value            |
+|---------------------|----------------------|
+| `BlockSize`         | `block_size`         |
+| `Permutation`       | `permutation`        |
+| `SimpleAllocation`  | `simple_allocation`  |
+
+An empty stream is the header line plus trailing `\n` only.
+
+---
+
+## 7. Manifests (in-memory)
+
+`build_manifests(&StudyConfig, &GeneratedList, &[u8; 32], &PackageMeta)`
+returns `ManifestPair { unblinded, blinded }` — the UTF-8 contents of
+`manifest.unblinded.json` and `manifest.blinded.json` (plan §6.2–§6.3).
+It does not write the filesystem or read the clock; `PackageMeta`
+supplies `operator` and `generated_at`.
+
+### 7.1 Encoding
+
+- Compact **canonical JSON** (same key-sort rules as §3 / plan §6.4)
+- Exactly one trailing `\n` after the JSON object
+- UTF-8, LF, no BOM
+
+### 7.2 Fields
+
+Shared by both manifests: `schema_version` (`"1.0"`), `study_id`,
+`protocol_version`, `generated_at`, `operator`, `config` (full
+`StudyConfig` wire object), `config_sha256`, `seed_sha256`, `rng`
+(`algorithm` / `crate` / `crate_version`), `engine_version`
+(`clinrand_core::ENGINE_VERSION` = core crate `CARGO_PKG_VERSION`),
+`algo_version`, `record_count`, `list_sha256`, `stream_sha256`.
+`rng.crate_version` is `clinrand_core::RNG_CRATE_VERSION` and must stay
+in sync with the exact `rand_chacha = "=…"` pin in `clinrand-core`.
+
+`generated_at` must be exactly `YYYY-MM-DDTHH:MM:SSZ` (`PackageMeta::new`
+and `build_manifests` validate). The package crate does not read the clock.
+
+Unblinded only: `seed_hex` (64 lowercase hex characters of the raw
+32-byte seed). Blinded omits the `seed_hex` **key** entirely; it still
+includes `seed_sha256`.
+
+### 7.3 Content hashes
+
+| Field | Digest input |
+|---|---|
+| `config_sha256` | Canonical JSON of `config` (§4); **no** trailing newline |
+| `seed_sha256` | The **32 raw seed bytes** (not the hex string) |
+| `list_sha256` | Exact UTF-8 bytes of `render_list_csv` (including final `\n`) |
+| `stream_sha256` | Exact UTF-8 bytes of `render_stream_csv` (including final `\n`) |
+
+All digests are SHA-256 encoded as 64 lowercase hex characters.
+
+---
+
+## 8. `write_package` and `checksums.txt`
+
+`write_package(out_dir, cfg, list, seed, meta) -> Result<PathBuf, PackageError>`
+creates a package directory and writes the Phase 4 file set (no `qc.R`),
+including both HTML reports. If the target package directory already
+exists, `write_package` returns [`PackageError::PackageDirExists`] and
+does not overwrite.
+
+### 8.1 Directory name
+
+```text
+<out_dir>/<study_id>_<generated_at compact>_<first 8 hex of list_sha256>/
+```
+
+`generated_at` is taken from `PackageMeta` (caller-supplied; no clock
+read). Compact form keeps ASCII alphanumerics only, so
+`2026-09-15T14:42:10Z` becomes `20260915T144210Z`. An already-compact
+value is left unchanged. `list_sha256` is SHA-256 of the exact
+`list.csv` UTF-8 bytes (§6.2), lowercase hex; the directory uses the
+first 8 characters.
+
+### 8.2 Files written
+
+| File | Source bytes |
+|---|---|
+| `list.csv` | `render_list_csv` |
+| `list.json` | `render_list_json` |
+| `stream.csv` | `render_stream_csv` |
+| `manifest.unblinded.json` | `ManifestPair.unblinded` from `build_manifests` |
+| `manifest.blinded.json` | `ManifestPair.blinded` from `build_manifests` |
+| `generation-report.html` | `render_generation_report` |
+| `unblinded-report.html` | `render_unblinded_report` |
+| `checksums.txt` | See §8.3 |
+
+Manifests are written as the exact `ManifestPair` strings — they are
+**not** re-serialized. The seed appears on disk only in
+`manifest.unblinded.json`.
+
+### 8.3 `checksums.txt`
+
+SHA-256 of every package file **except** `checksums.txt` itself
+(including both HTML reports). Format is GNU `sha256sum` **text mode**:
+one line per file
+
+```text
+<64 lowercase hex><two spaces><filename>\n
+```
+
+Lines are sorted by filename. Digests cover the exact UTF-8 bytes
+written to each file (including trailing newlines as specified above).
+
+---
+
+## 9. HTML reports (plan §6.5)
+
+Hand-rolled `format!` HTML in `clinrand-package` (no templating crate).
+
+### 9.1 `generation-report.html` (blinded)
+
+Must include: study id, protocol, `generated_at`, operator, full config
+(arms+ratios, method, blocks, strata, numbering), record counts per
+stratum, block structure (counts/sizes per stratum only — no arm
+composition), `seed_sha256` and data-file hashes, engine/algo versions
+(engine from `clinrand_core::ENGINE_VERSION`), [`check_properties`]
+results (P01–P10 ids and pass/fail / informational), a static sentence
+that **P10 is informational only and must not cause regeneration**, and
+the P10 max-run detail when that detail contains no config arm-code
+tokens. Other property-check details are omitted. Also truncation
+warnings, and a `per_stratum_range` disclosure warning when that
+numbering is used.
+
+Per-stratum count and block-structure rows follow
+`stratum_combinations` **canonical config order** (plan §5.4), including
+combinations with count `0` / no blocks. Do not sort stratum presentation
+by label. Numbering `start` / `width` (and `block_size`) are emitted on
+separate HTML lines from `kind=` to avoid blind-safety false positives
+with numeric arm codes.
+
+Must **not** include: the seed (or `seed_hex`), any randomization-number
+↔ arm pairing, per-block arm composition, or non-P10 property-check
+detail text that could name both a randomization number and an arm.
+
+Property results come from `clinrand_core::check_properties` — the
+package crate does not reimplement P01–P10.
+
+CI enforces blind-safety on a real `generate()`-derived DEMO list: for
+every randomization number, no line of the rendered blinded HTML contains
+both that number and any arm code (delimiter-aware tokens). The same
+assertion run against `unblinded-report.html` must find at least one
+violating line (negative control). The seed hex string must not appear.
+
+E2E: `generate` twice with the same seed yields equal lists; writing both
+packages under distinct parent temp dirs yields byte-identical `list.csv`
+and `stream.csv`; `checksums.txt` verifies including both HTML files.
+
+### 9.2 `unblinded-report.html` (restricted)
+
+Same metadata sections, plus full property-check **details** and a full
+allocation table (randomization number ↔ arm). Still never writes the
+seed.
