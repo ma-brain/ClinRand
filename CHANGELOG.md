@@ -10,6 +10,26 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 7 desktop application complete: Tauri 2 + SvelteKit (static SPA,
+  `ssr=false`) app with all plan §11.1 screens — config builder with live
+  validation, blinded structure preview, generate (with unblinded-material
+  confirmation, no encryption control), package viewer with verify and inline
+  blinded report, unblinded view behind an explicit confirmation that appends
+  a timestamped `access-log.txt` line, validation screen mirroring the three
+  tiers with their differing evidential status labelled, and About. Allocation,
+  hashing, canonicalization, and validation stay in `clinrand-core` /
+  `clinrand-package`; TypeScript only invokes Tauri commands. Capability
+  lock-down per §11.2 (only `dialog` + scopeless `fs`; no
+  `http`/`shell`/`process`/`updater`; CSP `default-src 'self'`, `connect-src
+  'self'`; desktop-only bundle targets). New `docs/security-posture.md`
+  documents the no-network posture and how to verify it from the capability
+  files. Added a `desktop` CI job (ubuntu) that builds the frontend, `cargo
+  check`s the Tauri host, runs the command-flow integration test, and greps the
+  capabilities for absence of `http`/`shell`/`process`/`updater`; `justfile`
+  `desktop-check`/`desktop-test`/`desktop-dev`/`desktop-caps-check` recipes;
+  and a GUI-free Rust integration test exercising validate → preview →
+  generate → verify and asserting no seed leaks in the generate outcome.
+  Seed never shown in the UI. `ALGO_VERSION` unchanged (1).
 - Phase 6 QC complete: study-specific `qc.R` emitted in every package
   (`render_qc_r`, independent stream reconstruction, hashes, P01–P09);
   CI installs R with `jsonlite` and `digest` and runs PASS/FAIL integration

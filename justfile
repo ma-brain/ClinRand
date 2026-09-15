@@ -4,7 +4,7 @@
 setup:
     cargo fetch
 
-# Run the CLI placeholder (desktop app arrives in Phase 7).
+# Run the CLI (for the desktop app, use `just desktop-dev`).
 dev:
     cargo run -p clinrand-cli
 
@@ -28,3 +28,24 @@ build:
 # Run the CLI wrapper.
 cli *ARGS:
     cargo run -p clinrand-cli -- {{ARGS}}
+
+# Frontend diagnostics + build, then Tauri host fmt/clippy/check/test.
+# Requires Node + Rust + system webview deps (see apps/desktop/README.md).
+desktop-check:
+    cd apps/desktop && npm ci && npm run check && npm run build
+    cd apps/desktop/src-tauri && cargo fmt --all -- --check
+    cd apps/desktop/src-tauri && cargo clippy --all-targets -- -D warnings
+    cd apps/desktop/src-tauri && cargo check --all-targets
+    cd apps/desktop/src-tauri && cargo test
+
+# Run the desktop host tests (command-flow integration + command units).
+desktop-test:
+    cd apps/desktop/src-tauri && cargo test
+
+# Run the desktop app in development (requires system webview).
+desktop-dev:
+    cd apps/desktop && npm install && npm run tauri dev
+
+# Confirm the capabilities grant no http/shell/process/updater permission.
+desktop-caps-check:
+    ! grep -rnE '"(http|shell|process|updater):' apps/desktop/src-tauri/capabilities
