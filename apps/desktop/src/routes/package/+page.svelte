@@ -19,6 +19,12 @@
   let reportHtml = $state<string | null>(null);
   let reportError = $state<string | null>(null);
 
+  // Monotonic request token. Each package load increments it; async helpers
+  // only commit their results if their captured token is still current, so an
+  // earlier, slower load can never overwrite a later selection's state.
+  let loadToken = 0;
+  const loading = $derived(verifying || loadingReport);
+
   onMount(() => {
     try {
       const stored = sessionStorage.getItem("clinrand:lastPackageDir");
@@ -41,54 +47,62 @@
     return `${trimmed}${separator}${file}`;
   }
 
-  async function runVerify(dir: string): Promise<void> {
-    verifying = true;
+  async function runVerify(dir: string, token: number): Promise<void> {
     try {
-      verifyOutcome = await invoke<VerifyOutcome>("verify_package", {
+      const outcome = await invoke<VerifyOutcome>("verify_package", {
         packageDir: dir,
       });
+      if (token !== loadToken) return;
+      verifyOutcome = outcome;
       verifyError = null;
     } catch (err) {
+      if (token !== loadToken) return;
       verifyOutcome = null;
       verifyError =
         err instanceof Error
           ? err.message
           : "The package could not be verified.";
     } finally {
-      verifying = false;
+      if (token === loadToken) verifying = false;
     }
   }
 
-  async function loadReport(dir: string): Promise<void> {
-    loadingReport = true;
+  async function loadReport(dir: string, token: number): Promise<void> {
     try {
       const path = joinPath(dir, REPORT_FILE);
       const present = await exists(path);
+      if (token !== loadToken) return;
       if (!present) {
         reportHtml = null;
         reportError = `This folder does not contain ${REPORT_FILE}. Confirm you selected a ClinRand package directory.`;
         return;
       }
-      reportHtml = await readTextFile(path);
+      const html = await readTextFile(path);
+      if (token !== loadToken) return;
+      reportHtml = html;
       reportError = null;
     } catch (err) {
+      if (token !== loadToken) return;
       reportHtml = null;
       reportError =
         err instanceof Error
           ? err.message
           : "The blinded report could not be read.";
     } finally {
-      loadingReport = false;
+      if (token === loadToken) loadingReport = false;
     }
   }
 
   async function loadPackage(dir: string): Promise<void> {
+    const token = ++loadToken;
     packageDir = dir;
     verifyOutcome = null;
     verifyError = null;
     reportHtml = null;
     reportError = null;
-    await Promise.all([runVerify(dir), loadReport(dir)]);
+    verifying = true;
+    loadingReport = true;
+    await Promise.all([runVerify(dir, token), loadReport(dir, token)]);
   }
 
   async function openPackage(): Promise<void> {
@@ -138,8 +152,12 @@
     </p>
   {/if}
   <div class="row">
-    <button type="button" class="primary" onclick={openPackage}>
-      {lastPackageDir ? "Open a package…" : "Choose package folder…"}
+    <button type="button" class="primary" onclick={openPackage} disabled={loading}>
+      {#if loading}
+        Loading…
+      {:else}
+        {lastPackageDir ? "Open a package…" : "Choose package folder…"}
+      {/if}
     </button>
     <p class="path-display" aria-live="polite">
       {#if packageDir}
@@ -308,6 +326,11 @@
     font: inherit;
     cursor: pointer;
     border-radius: 4px;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   button.primary {
