@@ -41,23 +41,52 @@ pub struct PropertyCheck {
 /// Does not mutate inputs and performs no I/O. P10 is always informational
 /// and always reports `passed: true`.
 pub fn check_properties(list: &GeneratedList, cfg: &StudyConfig) -> PropertyReport {
-    let expected_strata = stratum_combinations(&cfg.strata);
-    let n_strata = expected_strata.len();
-    let ratio_sum = cfg.arms.iter().map(|a| a.ratio).sum::<u32>();
+    let strata_result = stratum_combinations(&cfg.strata);
+    let ratio_sum = cfg
+        .arms
+        .iter()
+        .try_fold(0u32, |acc, a| acc.checked_add(a.ratio));
     let max_block = max_configured_block_size(cfg);
 
-    let checks = vec![
-        check_p01(list, cfg, n_strata),
-        check_p02(list, cfg),
-        check_p03(list, cfg, ratio_sum),
-        check_p04(list),
-        check_p05(list, cfg, &expected_strata),
-        check_p06(list, cfg, &expected_strata),
-        check_p07(list, cfg, &expected_strata),
-        check_p08(list),
-        check_p09(list, cfg, ratio_sum, max_block, &expected_strata),
-        check_p10(list, &expected_strata),
-    ];
+    let checks = match strata_result {
+        Ok(expected_strata) => {
+            let n_strata = expected_strata.len();
+            vec![
+                check_p01(list, cfg, n_strata),
+                check_p02(list, cfg),
+                check_p03(list, cfg, ratio_sum),
+                check_p04(list),
+                check_p05(list, cfg, &expected_strata),
+                check_p06(list, cfg, &expected_strata),
+                check_p07(list, cfg, &expected_strata),
+                check_p08(list),
+                check_p09(list, cfg, ratio_sum, max_block, &expected_strata),
+                check_p10(list, &expected_strata),
+            ]
+        }
+        Err(_) => {
+            let detail = "stratum combination count overflowed";
+            vec![
+                fail("P01", detail),
+                check_p02(list, cfg),
+                check_p03(list, cfg, ratio_sum),
+                check_p04(list),
+                fail("P05", detail),
+                fail("P06", detail),
+                fail("P07", detail),
+                check_p08(list),
+                fail("P09", detail),
+                PropertyCheck {
+                    id: "P10",
+                    passed: true,
+                    informational: true,
+                    detail: format!(
+                        "informational only (not a failure): {detail}; max-run not computed"
+                    ),
+                },
+            ]
+        }
+    };
     PropertyReport { checks }
 }
 
@@ -164,32 +193,71 @@ fn block_groups(
     groups
 }
 
+/// Highest `block_id` observed in each stratum (for §5.5 truncated-final detection).
+fn max_block_id_per_stratum(
+    records: &[AllocationRecord],
+) -> HashMap<&BTreeMap<String, String>, u32> {
+    let mut max_ids: HashMap<&BTreeMap<String, String>, u32> = HashMap::new();
+    for rec in records {
+        max_ids
+            .entry(&rec.stratum)
+            .and_modify(|m| *m = (*m).max(rec.block_id))
+            .or_insert(rec.block_id);
+    }
+    max_ids
+}
+
+/// True when this group is the stratum's highest `block_id` and kept < block_size
+/// (plan §5.5 truncated final block — the only under-full exemption).
+fn is_truncated_final_block(
+    stratum: &BTreeMap<String, String>,
+    block_id: u32,
+    kept: u32,
+    block_size: u32,
+    max_ids: &HashMap<&BTreeMap<String, String>, u32>,
+) -> bool {
+    kept < block_size && max_ids.get(stratum) == Some(&block_id)
+}
+
 /// P03: every complete (non-truncated) block has exact ratio counts.
-/// Truncated final blocks (kept < block_size) are skipped.
+/// Only the truncated final block of each stratum (highest `block_id` when
+/// kept < block_size) is exempt. Non-final under-full blocks fail.
 /// Simple size-1 blocks are not ratio-bearing units when block_size is not a
 /// multiple of the ratio sum — those blocks are skipped.
-fn check_p03(list: &GeneratedList, cfg: &StudyConfig, ratio_sum: u32) -> PropertyCheck {
+fn check_p03(list: &GeneratedList, cfg: &StudyConfig, ratio_sum: Option<u32>) -> PropertyCheck {
+    let Some(ratio_sum) = ratio_sum else {
+        return fail("P03", "ratio sum overflowed u32");
+    };
     if ratio_sum == 0 {
         return fail("P03", "ratio sum is zero");
     }
     let groups = block_groups(&list.records);
+    let max_ids = max_block_id_per_stratum(&list.records);
     let mut checked = 0u32;
     for ((stratum, block_id), members) in &groups {
         let Some(first) = members.first() else {
             continue;
         };
         let block_size = first.block_size;
-        // Truncated: fewer kept positions than block_size.
-        if (members.len() as u32) < block_size {
-            continue;
-        }
-        if (members.len() as u32) > block_size {
+        let kept = members.len() as u32;
+        if kept > block_size {
             return fail(
                 "P03",
                 format!(
-                    "stratum {:?}/block {block_id}: kept {} exceeds block_size {block_size}",
-                    stratum,
-                    members.len()
+                    "stratum {:?}/block {block_id}: kept {kept} exceeds block_size {block_size}",
+                    stratum
+                ),
+            );
+        }
+        if kept < block_size {
+            if is_truncated_final_block(stratum, *block_id, kept, block_size, &max_ids) {
+                continue;
+            }
+            return fail(
+                "P03",
+                format!(
+                    "stratum {:?}/block {block_id}: non-final under-full block (kept {kept} < block_size {block_size})",
+                    stratum
                 ),
             );
         }
@@ -234,7 +302,9 @@ fn check_p03(list: &GeneratedList, cfg: &StudyConfig, ratio_sum: u32) -> Propert
     }
     ok(
         "P03",
-        format!("checked {checked} complete ratio-bearing block(s); truncated finals skipped"),
+        format!(
+            "checked {checked} complete ratio-bearing block(s); truncated final blocks skipped"
+        ),
     )
 }
 
@@ -445,50 +515,66 @@ fn check_p07(
     )
 }
 
-/// P08: position_in_block is 1..kept complete without gaps for every block.
+/// P08: `position_in_block` is 1..block_size without gaps for complete blocks.
+/// Truncated final blocks (highest `block_id` per stratum when kept < block_size)
+/// may use 1..kept. Non-final under-full blocks fail.
 fn check_p08(list: &GeneratedList) -> PropertyCheck {
     let groups = block_groups(&list.records);
+    let max_ids = max_block_id_per_stratum(&list.records);
     for ((stratum, block_id), members) in &groups {
+        let Some(first) = members.first() else {
+            continue;
+        };
+        let block_size = first.block_size;
         let kept = members.len() as u32;
+        if kept > block_size {
+            return fail(
+                "P08",
+                format!(
+                    "stratum {:?}/block {block_id}: kept {kept} > block_size {block_size}",
+                    stratum
+                ),
+            );
+        }
+        let truncated_final =
+            is_truncated_final_block(stratum, *block_id, kept, block_size, &max_ids);
+        if kept < block_size && !truncated_final {
+            return fail(
+                "P08",
+                format!(
+                    "stratum {:?}/block {block_id}: non-final under-full block (kept {kept} < block_size {block_size})",
+                    stratum
+                ),
+            );
+        }
+        let expected_end = if truncated_final { kept } else { block_size };
         let mut positions: Vec<u32> = members.iter().map(|r| r.position_in_block).collect();
         positions.sort_unstable();
-        let expected: Vec<u32> = (1..=kept).collect();
+        let expected: Vec<u32> = (1..=expected_end).collect();
         if positions != expected {
             return fail(
                 "P08",
                 format!(
-                    "stratum {:?}/block {block_id}: positions {:?} != expected 1..{kept}",
+                    "stratum {:?}/block {block_id}: positions {:?} != expected 1..{expected_end}",
                     stratum, positions
                 ),
             );
         }
-        // Also: no position exceeds the declared block_size.
-        if let Some(first) = members.first() {
-            if kept > first.block_size {
+        for rec in members {
+            if rec.position_in_block == 0 || rec.position_in_block > block_size {
                 return fail(
                     "P08",
                     format!(
-                        "stratum {:?}/block {block_id}: kept {kept} > block_size {}",
-                        stratum, first.block_size
+                        "stratum {:?}/block {block_id}: position_in_block {} outside 1..{block_size}",
+                        stratum, rec.position_in_block
                     ),
                 );
-            }
-            for rec in members {
-                if rec.position_in_block == 0 || rec.position_in_block > first.block_size {
-                    return fail(
-                        "P08",
-                        format!(
-                            "stratum {:?}/block {block_id}: position_in_block {} outside 1..{}",
-                            stratum, rec.position_in_block, first.block_size
-                        ),
-                    );
-                }
             }
         }
     }
     ok(
         "P08",
-        "position_in_block is 1..kept without gaps for every block",
+        "position_in_block is 1..block_size (or 1..kept for truncated finals) without gaps",
     )
 }
 
@@ -502,7 +588,7 @@ fn check_p08(list: &GeneratedList) -> PropertyCheck {
 fn check_p09(
     list: &GeneratedList,
     cfg: &StudyConfig,
-    ratio_sum: u32,
+    ratio_sum: Option<u32>,
     max_block: u32,
     expected_strata: &[BTreeMap<String, String>],
 ) -> PropertyCheck {
@@ -512,6 +598,9 @@ fn check_p09(
             "simple randomization has no block-balance guarantee; P09 not applied",
         );
     }
+    let Some(ratio_sum) = ratio_sum else {
+        return fail("P09", "ratio sum overflowed u32");
+    };
     if ratio_sum == 0 {
         return fail("P09", "ratio sum is zero");
     }

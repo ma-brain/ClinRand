@@ -195,9 +195,54 @@ fn p03_skips_truncated_final_block() {
 }
 
 #[test]
+fn p03_fails_on_non_final_under_full_block() {
+    // Block 1 under-full while block 2 still present → not a §5.5 truncated final.
+    let cfg = permuted_fixed_cfg(6, 4);
+    let list = GeneratedList {
+        records: vec![
+            rec("0001", empty_stratum(), 1, 4, 1, "A"),
+            rec("0002", empty_stratum(), 1, 4, 2, "P"),
+            // Missing positions 3–4 in block 1, then a later block.
+            rec("0003", empty_stratum(), 2, 4, 1, "A"),
+            rec("0004", empty_stratum(), 2, 4, 2, "P"),
+            rec("0005", empty_stratum(), 2, 4, 3, "A"),
+            rec("0006", empty_stratum(), 2, 4, 4, "P"),
+        ],
+        stream: StreamLog::default(),
+    };
+    assert_check_fails(&list, &cfg, "P03");
+}
+
+#[test]
 fn p04_fails_on_duplicate_randomization_numbers() {
     let (cfg, mut list) = valid_balanced_block_list();
     list.records[3].randomization_number = "0001".into();
+    assert_check_fails(&list, &cfg, "P04");
+}
+
+#[test]
+fn overlapping_per_stratum_range_generates_list_that_fails_p04() {
+    // Decision 0006 / plan §5.6: validate does not reject overlap; P04 catches it.
+    let cfg = StudyConfig {
+        schema_version: "1.0".into(),
+        study_id: "DEMO-406".into(),
+        protocol_version: "1.0".into(),
+        arms: arms_1_1(),
+        method: Method::StratifiedBlock {
+            block: BlockScheme::Fixed { size: 4 },
+        },
+        strata: vec![StratificationFactor {
+            name: "site".into(),
+            levels: vec!["001".into(), "002".into()],
+        }],
+        list_length_per_stratum: 10,
+        numbering: NumberingScheme::PerStratumRange {
+            start: 1,
+            block_size: 5, // < length → stratum ranges overlap
+            width: 4,
+        },
+    };
+    let list = generate(&cfg, seed_a()).expect("overlap is not a generate reject");
     assert_check_fails(&list, &cfg, "P04");
 }
 
@@ -249,6 +294,40 @@ fn p08_fails_when_position_in_block_has_gaps() {
     let (cfg, mut list) = valid_balanced_block_list();
     list.records[2].position_in_block = 4; // positions 1,2,4,4 — gap at 3, duplicate 4
     list.records[3].position_in_block = 4;
+    assert_check_fails(&list, &cfg, "P08");
+}
+
+#[test]
+fn p08_passes_truncated_final_with_positions_1_through_kept() {
+    let cfg = permuted_fixed_cfg(6, 4);
+    let list = GeneratedList {
+        records: vec![
+            rec("0001", empty_stratum(), 1, 4, 1, "A"),
+            rec("0002", empty_stratum(), 1, 4, 2, "P"),
+            rec("0003", empty_stratum(), 1, 4, 3, "A"),
+            rec("0004", empty_stratum(), 1, 4, 4, "P"),
+            rec("0005", empty_stratum(), 2, 4, 1, "A"),
+            rec("0006", empty_stratum(), 2, 4, 2, "P"),
+        ],
+        stream: StreamLog::default(),
+    };
+    assert_check_passes(&list, &cfg, "P08");
+}
+
+#[test]
+fn p08_fails_on_non_final_under_full_block() {
+    let cfg = permuted_fixed_cfg(6, 4);
+    let list = GeneratedList {
+        records: vec![
+            rec("0001", empty_stratum(), 1, 4, 1, "A"),
+            rec("0002", empty_stratum(), 1, 4, 2, "P"),
+            rec("0003", empty_stratum(), 2, 4, 1, "A"),
+            rec("0004", empty_stratum(), 2, 4, 2, "P"),
+            rec("0005", empty_stratum(), 2, 4, 3, "A"),
+            rec("0006", empty_stratum(), 2, 4, 4, "P"),
+        ],
+        stream: StreamLog::default(),
+    };
     assert_check_fails(&list, &cfg, "P08");
 }
 

@@ -15,7 +15,7 @@ fn combo(factors: &[(&str, &[&str])]) -> Vec<BTreeMap<String, String>> {
             levels: levels.iter().map(|l| (*l).into()).collect(),
         })
         .collect();
-    stratum_combinations(&strata)
+    stratum_combinations(&strata).expect("hand-worked factors must not overflow")
 }
 
 fn as_pairs(map: &BTreeMap<String, String>) -> Vec<(&str, &str)> {
@@ -86,4 +86,17 @@ fn three_factors_last_factor_varies_fastest() {
     for (combo, want) in combos.iter().zip(expected) {
         assert_eq!(as_pairs(combo), want);
     }
+}
+
+#[test]
+fn combination_count_overflow_returns_error() {
+    // 64 binary factors: product reaches 2^64 and overflows usize on 64-bit hosts.
+    let factors: Vec<StratificationFactor> = (0..64)
+        .map(|i| StratificationFactor {
+            name: format!("f{i}"),
+            levels: vec!["0".into(), "1".into()],
+        })
+        .collect();
+    let err = stratum_combinations(&factors).expect_err("2^64 must overflow usize");
+    assert_eq!(err, clinrand_core::StratumError::Overflow);
 }

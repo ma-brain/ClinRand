@@ -84,7 +84,7 @@ pub fn generate(cfg: &StudyConfig, seed: [u8; 32]) -> Result<GeneratedList, Gene
         records: Vec::new(),
         ratio_sum: ratio_sum(&cfg.arms)?,
     };
-    let strata = stratum_combinations(&cfg.strata);
+    let strata = stratum_combinations(&cfg.strata).map_err(|_| GenerationError::Overflow)?;
 
     match &cfg.method {
         Method::Simple => {

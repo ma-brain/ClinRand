@@ -32,7 +32,7 @@ pub use generate::{generate, AllocationRecord, GeneratedList, GenerationError};
 pub use permute::permute;
 pub use properties::{check_properties, PropertyCheck, PropertyReport};
 pub use rng::Rng;
-pub use strata::stratum_combinations;
+pub use strata::{stratum_combinations, StratumError};
 pub use stream::{DrawPurpose, StreamDraw, StreamLog};
 pub use uniform::{uniform_below, U64Draw, UniformError};
 pub use validate::{validate_config, ConfigError, ConfigWarning, ValidateOptions};

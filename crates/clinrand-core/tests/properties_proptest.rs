@@ -89,8 +89,8 @@ fn arb_strata(
 }
 
 fn arb_list_length() -> impl Strategy<Value = u32> {
-    // Keep cases fast under 1000 runs; include 0 and truncation-friendly lengths.
-    prop_oneof![Just(0u32), 1u32..=24]
+    // Keep cases fast under 1000 runs; zero is covered but rare (~5%).
+    prop_oneof![1 => Just(0u32), 19 => 1u32..=24]
 }
 
 fn arb_numbering(list_length: u32) -> impl Strategy<Value = NumberingScheme> {
