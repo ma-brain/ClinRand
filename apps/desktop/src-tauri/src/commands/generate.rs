@@ -15,7 +15,9 @@
 use std::path::Path;
 
 use chrono::Utc;
-use clinrand_core::{generate_with_options, validate_config, GenerationError, StudyConfig, ValidateOptions};
+use clinrand_core::{
+    generate_with_options, validate_config, GenerationError, StudyConfig, ValidateOptions,
+};
 use clinrand_package::{render_list_csv, sha256_hex, write_package, PackageError, PackageMeta};
 use serde::Serialize;
 

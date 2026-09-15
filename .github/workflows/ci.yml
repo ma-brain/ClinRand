@@ -51,7 +51,7 @@ jobs:
             wget
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: rustfmt, clippy
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -69,12 +69,21 @@ jobs:
       - name: Install frontend dependencies
         working-directory: apps/desktop
         run: npm ci
+      - name: Svelte / TypeScript check
+        working-directory: apps/desktop
+        run: npm run check
       - name: Build frontend (produces ../build for the Tauri context)
         working-directory: apps/desktop
         run: npm run build
+      - name: rustfmt check (Tauri host)
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --all -- --check
       - name: cargo check (Tauri host)
         working-directory: apps/desktop/src-tauri
         run: cargo check --all-targets
+      - name: cargo clippy (Tauri host)
+        working-directory: apps/desktop/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
       - name: cargo test (command-flow integration)
         working-directory: apps/desktop/src-tauri
         run: cargo test

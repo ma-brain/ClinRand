@@ -168,7 +168,9 @@ fn parse_format(format: Option<&str>) -> Result<ReportFormat, String> {
     match format.unwrap_or("md") {
         "md" => Ok(ReportFormat::Markdown),
         "html" => Ok(ReportFormat::Html),
-        other => Err(format!("unknown report format {other:?}; expected md or html")),
+        other => Err(format!(
+            "unknown report format {other:?}; expected md or html"
+        )),
     }
 }
 
@@ -848,8 +850,7 @@ mod tests {
 
     #[test]
     fn reference_tier_passes_against_bundled_vectors() {
-        let outcome =
-            run_validation_report(Some("reference".to_string()), None).expect("report");
+        let outcome = run_validation_report(Some("reference".to_string()), None).expect("report");
         assert!(outcome.ok, "report: {}", outcome.report);
         assert_eq!(outcome.outcome, "pass");
         assert_eq!(outcome.format, "md");
@@ -858,8 +859,7 @@ mod tests {
 
     #[test]
     fn regression_tier_skips_when_no_fixtures() {
-        let outcome =
-            run_validation_report(Some("regression".to_string()), None).expect("report");
+        let outcome = run_validation_report(Some("regression".to_string()), None).expect("report");
         // No fixtures exist yet (Phase 9); the whole (single-tier) report skips.
         assert_eq!(outcome.outcome, "skip");
         assert!(outcome.ok);
@@ -867,19 +867,16 @@ mod tests {
 
     #[test]
     fn properties_tier_passes_bounded_sweep() {
-        let outcome =
-            run_validation_report(Some("properties".to_string()), None).expect("report");
+        let outcome = run_validation_report(Some("properties".to_string()), None).expect("report");
         assert!(outcome.ok, "report: {}", outcome.report);
         assert_eq!(outcome.outcome, "pass");
     }
 
     #[test]
     fn html_format_is_honored() {
-        let outcome = run_validation_report(
-            Some("reference".to_string()),
-            Some("html".to_string()),
-        )
-        .expect("report");
+        let outcome =
+            run_validation_report(Some("reference".to_string()), Some("html".to_string()))
+                .expect("report");
         assert_eq!(outcome.format, "html");
         assert!(outcome.report.contains("<!DOCTYPE html>"));
     }

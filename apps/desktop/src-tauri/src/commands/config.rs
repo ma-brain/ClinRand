@@ -202,7 +202,12 @@ pub fn preview_structure(json: String) -> Result<StructurePreview, String> {
     // Surface warnings when the config validates; do not fail preview on
     // validation errors — preview is intentionally config-derived and lenient
     // so operators can inspect structure while still editing.
-    let warnings = match validate_config(&cfg, &ValidateOptions { allow_large_strata: true }) {
+    let warnings = match validate_config(
+        &cfg,
+        &ValidateOptions {
+            allow_large_strata: true,
+        },
+    ) {
         Ok(warnings) => warnings.iter().map(ToString::to_string).collect(),
         Err(_) => Vec::new(),
     };

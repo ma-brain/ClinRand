@@ -29,11 +29,14 @@ build:
 cli *ARGS:
     cargo run -p clinrand-cli -- {{ARGS}}
 
-# Build the desktop frontend and check the Tauri host compiles.
+# Frontend diagnostics + build, then Tauri host fmt/clippy/check/test.
 # Requires Node + Rust + system webview deps (see apps/desktop/README.md).
 desktop-check:
-    cd apps/desktop && npm ci && npm run build
+    cd apps/desktop && npm ci && npm run check && npm run build
+    cd apps/desktop/src-tauri && cargo fmt --all -- --check
+    cd apps/desktop/src-tauri && cargo clippy --all-targets -- -D warnings
     cd apps/desktop/src-tauri && cargo check --all-targets
+    cd apps/desktop/src-tauri && cargo test
 
 # Run the desktop host tests (command-flow integration + command units).
 desktop-test:
