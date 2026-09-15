@@ -26,6 +26,52 @@
   // slower reveal can never overwrite a later selection's state.
   let loadToken = 0;
 
+  // Modal focus management: containment while open, restoration on close.
+  let dialogEl = $state<HTMLDivElement | null>(null);
+  let cancelButtonEl = $state<HTMLButtonElement | null>(null);
+  let previouslyFocused: HTMLElement | null = null;
+
+  // When the confirmation modal opens, move initial focus onto the (safe)
+  // Cancel button so keyboard users start inside the dialog rather than on the
+  // background picker button.
+  $effect(() => {
+    if (confirmOpen && cancelButtonEl) {
+      cancelButtonEl.focus();
+    }
+  });
+
+  function restoreFocus(): void {
+    const target = previouslyFocused;
+    previouslyFocused = null;
+    // Only restore if the element is still connected to the document.
+    if (target && target.isConnected) target.focus();
+  }
+
+  function onModalKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelConfirm();
+      return;
+    }
+    if (event.key !== "Tab" || dialogEl === null) return;
+    const focusable = Array.from(
+      dialogEl.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   onMount(() => {
     try {
       const stored = sessionStorage.getItem("clinrand:lastPackageDir");
@@ -74,7 +120,9 @@
         defaultPath: lastPackageDir ?? undefined,
       });
       if (typeof selected === "string") {
-        // Arm the confirmation step; do not reveal anything yet.
+        // Arm the confirmation step; do not reveal anything yet. Remember the
+        // trigger so focus can be restored when the modal closes.
+        previouslyFocused = document.activeElement as HTMLElement | null;
         pendingDir = selected;
         confirmOpen = true;
       }
@@ -89,12 +137,14 @@
   function cancelConfirm(): void {
     confirmOpen = false;
     pendingDir = null;
+    restoreFocus();
   }
 
   async function confirmReveal(): Promise<void> {
     const dir = pendingDir;
     if (dir === null) return;
     confirmOpen = false;
+    restoreFocus();
 
     const token = ++loadToken;
     revealing = true;
@@ -229,12 +279,16 @@
 {/if}
 
 {#if confirmOpen}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
+    bind:this={dialogEl}
     class="modal-backdrop"
     role="dialog"
     aria-modal="true"
     aria-labelledby="confirm-title"
     aria-describedby="confirm-body"
+    tabindex="-1"
+    onkeydown={onModalKeydown}
   >
     <div class="modal">
       <h2 id="confirm-title" class="modal-title">Reveal unblinded assignments?</h2>
@@ -257,7 +311,12 @@
         </p>
       </div>
       <div class="modal-actions">
-        <button type="button" class="secondary" onclick={cancelConfirm}>
+        <button
+          type="button"
+          class="secondary"
+          bind:this={cancelButtonEl}
+          onclick={cancelConfirm}
+        >
           Cancel
         </button>
         <button type="button" class="danger" onclick={confirmReveal}>
