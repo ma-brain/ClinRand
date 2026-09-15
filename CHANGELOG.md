@@ -10,6 +10,12 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 6 QC complete: study-specific `qc.R` emitted in every package
+  (`render_qc_r`, independent stream reconstruction, hashes, P01–P09);
+  CI installs R with `jsonlite` and `digest` and runs PASS/FAIL integration
+  tests; `docs/qc-procedure.md` documents operator QC, seed handling, and
+  optional §9.3 distributional comparison with `blockrand`/`randomizeR`.
+  `checksums.txt` includes `qc.R`. `ALGO_VERSION` unchanged (1).
 - Phase 5 CLI complete: all plan §10 commands (`list-methods`,
   `validate-config`, `generate`, `reproduce`, `verify`,
   `validation-report`, `version`), global `--json`, exit codes 0–4, and

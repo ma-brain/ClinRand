@@ -28,9 +28,10 @@ to **myIWRS**, a separate web application.
 
 ## Status
 
-Phases 1–4 (engine and package writer) and Phase 5 (CLI) are
+Phases 1–6 (engine, package writer, CLI, and emitted `qc.R`) are
 implemented. The desktop application remains Phase 7. See
-[`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md), and
+[`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md),
+[`docs/qc-procedure.md`](docs/qc-procedure.md), and
 [`docs/plans/clinrand-implementation-plan.md`](docs/plans/clinrand-implementation-plan.md).
 
 ## Install

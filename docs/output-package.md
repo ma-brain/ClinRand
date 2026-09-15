@@ -348,7 +348,8 @@ Manifests are written as the exact `ManifestPair` strings — they are
 ### 8.3 `checksums.txt`
 
 SHA-256 of every package file **except** `checksums.txt` itself
-(including both HTML reports). Format is GNU `sha256sum` **text mode**:
+(including both HTML reports and `qc.R`). Format is GNU `sha256sum`
+**text mode**:
 one line per file
 
 ```text
