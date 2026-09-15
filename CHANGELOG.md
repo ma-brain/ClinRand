@@ -10,8 +10,14 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `generate` in `clinrand-core` for `simple`, `permuted_block`, and
+  `stratified_block`: block truncation (§5.5), global and
+  `per_stratum_range` numbering (§5.6), one shared RNG/stream per run.
+  Numbering width overflow policy in `docs/decisions/0005-*.md`.
+  Simple stream order documented in `docs/determinism.md`.
 - Descending Fisher–Yates `permute` in `clinrand-core` (plan §2.3) with
   hand-worked reference cases under `validation/reference/fisher-yates/`.
+- Canonical stratum Cartesian product `stratum_combinations` (plan §5.4).
 - `canonical_json_value` in `clinrand-package`: the same plan §6.4
   canonicalizer over a `serde_json::Value`, so Phase 4 can reuse one
   implementation. `canonical_json(&StudyConfig)` calls it.

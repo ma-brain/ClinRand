@@ -158,6 +158,20 @@ For each stratum, and for each block in ascending block index:
 
 Fixed block size skips step 1.
 
+### Simple randomization
+
+For `method: simple`, there is no block-size draw and no Fisher–Yates.
+For each stratum in canonical order, and for each position in
+`0..list_length_per_stratum`:
+
+1. Draw `uniform_below(rng, log, ratio_sum, SimpleAllocation)`.
+2. Map the draw to an arm via cumulative ratios in **config arm order**
+   (the first arm owns `[0, ratio)`, the next owns the following
+   `ratio` integers, and so on).
+
+Each position is recorded as a size-1 block (`block_id` ascending from
+1 within the stratum, `block_size = 1`, `position_in_block = 1`).
+
 ---
 
 ## 6. Canonical stratum order (plan §5.4)

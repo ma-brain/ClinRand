@@ -18,6 +18,7 @@
 pub const ALGO_VERSION: u32 = 1;
 
 mod config;
+mod generate;
 mod permute;
 mod rng;
 mod strata;
@@ -26,6 +27,7 @@ mod uniform;
 mod validate;
 
 pub use config::{Arm, BlockScheme, Method, NumberingScheme, StratificationFactor, StudyConfig};
+pub use generate::{generate, AllocationRecord, GeneratedList, GenerationError};
 pub use permute::permute;
 pub use rng::Rng;
 pub use strata::stratum_combinations;
