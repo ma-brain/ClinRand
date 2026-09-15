@@ -9,7 +9,7 @@ criteria are met.
 - [x] Phase 2 — Config and canonicalization (`StudyConfig`, `validate_config`, JSON Schema, canonical JSON)
 - [x] Phase 3 — Generation engine (simple / permuted-block / stratified-block, numbering, P01–P10, proptest)
 - [x] Phase 4 — Package writer (`list.csv`, manifests, reports, checksums, blind-safety test)
-- [ ] Phase 5 — CLI (`generate`, `reproduce`, `verify`, `validation-report`, exit codes)
+- [x] Phase 5 — CLI (`generate`, `reproduce`, `verify`, `validation-report`, exit codes)
 - [ ] Phase 6 — Emitted `qc.R` and `docs/qc-procedure.md`
 - [ ] Phase 7 — Desktop application (Tauri 2 + SvelteKit, capability lock-down, `docs/security-posture.md`)
 - [ ] Phase 8 — Encryption at rest and tagged release installers

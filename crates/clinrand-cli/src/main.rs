@@ -86,4 +86,3 @@ fn run_list_methods(json: bool) -> ExitCode {
     }
     ExitCode::Success
 }
-

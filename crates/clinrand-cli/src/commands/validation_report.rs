@@ -4,9 +4,9 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use clinrand_core::{
-    check_properties, generate, permute, uniform_below, Arm, BlockScheme, DrawPurpose,
-    Method, NumberingScheme, Rng, StratificationFactor, StreamDraw, StreamLog, StudyConfig,
-    U64Draw, UniformError, ValidateOptions,
+    check_properties, generate, permute, uniform_below, Arm, BlockScheme, DrawPurpose, Method,
+    NumberingScheme, Rng, StratificationFactor, StreamDraw, StreamLog, StudyConfig, U64Draw,
+    UniformError, ValidateOptions,
 };
 
 use crate::exit::ExitCode;
@@ -24,10 +24,7 @@ const FISHER_YATES_CASES: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../validation/reference/fisher-yates/cases.json"
 ));
-const REGRESSION_DIR: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../validation/regression"
-);
+const REGRESSION_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../validation/regression");
 
 const REFERENCE_EVIDENCE: &str = "Correctness against external normative sources (RFC 8439, hand-worked derivations). Expected values are not this engine's own output.";
 const PROPERTIES_EVIDENCE: &str = "Invariant evidence only — not external-oracle correctness. A passing sweep means P01–P09 held for sampled configs; it does not prove the algorithm matches an independent reference. Full 1000-case CI suite: `cargo test -p clinrand-core --test properties_proptest`.";
@@ -241,7 +238,10 @@ fn run_uniform_below_case(cases_json: &str, case_id: &str) -> Result<(), String>
 
     let consumed = json_u64(expect, "consumed")?;
     if u64::try_from(stream.pos).map_err(|_| "pos overflow".to_string())? != consumed {
-        return Err(format!("consumed {case_id}: expected {consumed}, got {}", stream.pos));
+        return Err(format!(
+            "consumed {case_id}: expected {consumed}, got {}",
+            stream.pos
+        ));
     }
     let expected_stream = json_stream(expect)?;
     if log.draws != expected_stream {
@@ -387,9 +387,7 @@ fn property_config(index: u32) -> StudyConfig {
         .collect();
 
     let ratio_sum: u32 = arms.iter().map(|a| a.ratio).sum();
-    let block_sizes: Vec<u32> = (1..=24)
-        .filter(|size| size % ratio_sum == 0)
-        .collect();
+    let block_sizes: Vec<u32> = (1..=24).filter(|size| size % ratio_sum == 0).collect();
     let block_size = block_sizes
         .get((index as usize) % block_sizes.len().max(1))
         .copied()
@@ -500,12 +498,7 @@ fn count_regression_fixtures(dir: &Path) -> usize {
     entries
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_dir())
-        .filter(|entry| {
-            entry
-                .file_name()
-                .to_string_lossy()
-                .starts_with("algo-v")
-        })
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("algo-v"))
         .count()
 }
 
@@ -638,10 +631,7 @@ fn emit_json(report: &ValidationReport) -> std::io::Result<()> {
         })
         .collect();
 
-    let ok = !report
-        .tiers
-        .iter()
-        .any(|t| t.outcome == TierOutcome::Fail);
+    let ok = !report.tiers.iter().any(|t| t.outcome == TierOutcome::Fail);
     let payload = serde_json::json!({ "ok": ok, "tiers": tiers });
     write_stdout(&format!("{payload}\n"))
 }
@@ -797,8 +787,7 @@ fn parse_purpose(name: &str) -> Result<DrawPurpose, String> {
 }
 
 fn json_ident(object: &str, key: &str) -> Result<String, String> {
-    json_optional_str(object, key)?
-        .ok_or_else(|| format!("missing string field {key}"))
+    json_optional_str(object, key)?.ok_or_else(|| format!("missing string field {key}"))
 }
 
 fn json_stream(expect: &str) -> Result<Vec<StreamDraw>, String> {
@@ -842,7 +831,10 @@ fn json_u64_strings(object: &str, key: &str) -> Result<Vec<u64>, String> {
             if part.is_empty() {
                 None
             } else {
-                Some(part.parse::<u64>().map_err(|err| format!("invalid u64 {part}: {err}")))
+                Some(
+                    part.parse::<u64>()
+                        .map_err(|err| format!("invalid u64 {part}: {err}")),
+                )
             }
         })
         .collect::<Result<Vec<_>, _>>()

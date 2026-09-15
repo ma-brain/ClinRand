@@ -10,6 +10,13 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 5 CLI complete: all plan §10 commands (`list-methods`,
+  `validate-config`, `generate`, `reproduce`, `verify`,
+  `validation-report`, `version`), global `--json`, exit codes 0–4, and
+  `docs/cli.md`. E2E round-trip CI test (library package write → CLI
+  `reproduce` → CLI `verify`; `reproduce` refuses `algo_version`
+  mismatch with exit 4). `--encrypt` deferred to Phase 8.
+  `ALGO_VERSION` unchanged (1).
 - Phase 4 final-review hardenings: `write_package` refuses overwrite of an
   existing package directory; E2E calls `generate` twice then writes under
   distinct parent dirs and asserts equal lists plus byte-identical
