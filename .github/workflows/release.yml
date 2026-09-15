@@ -9,7 +9,10 @@ name: Release
 # certificate (docs/decisions/0009-unsigned-release-installers.md). This is
 # a deliberate scope decision, not an oversight.
 #
-# workflow_dispatch lets this be exercised without cutting a real tag.
+# workflow_dispatch lets this be exercised without cutting a real release
+# tag: it builds from the current commit of the selected branch and creates
+# a fresh tag/release marked as a prerelease, so it can't be mistaken for a
+# real release. A `push: tags: v*` run is never a prerelease.
 
 on:
   push:
@@ -17,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (must already exist, e.g. v0.1.0)"
+        description: "Tag name to create for this test build (marked as a prerelease)"
         required: true
 
 permissions:
@@ -47,9 +50,11 @@ jobs:
             args: ""
     runs-on: ${{ matrix.os }}
     steps:
+      # No `ref` override: for a tag push this checks out the tag as usual;
+      # for workflow_dispatch it checks out the commit that was selected to
+      # run the workflow (the tag being created doesn't exist as a git ref
+      # yet — tauri-action creates it against this same commit below).
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Install Tauri system dependencies (Linux)
         if: matrix.os == 'ubuntu-22.04'
@@ -86,8 +91,9 @@ jobs:
           projectPath: apps/desktop
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseName: "ClinRand ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          releaseCommitish: ${{ github.sha }}
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
           args: ${{ matrix.args }}
           # No updater plugin is compiled in (AGENTS.md §4 prohibition 4) —
           # never let this action attach updater artifacts or signatures.
