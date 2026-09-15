@@ -3,3 +3,4 @@
 pub mod generate;
 pub mod reproduce;
 pub mod validate_config;
+pub mod verify;

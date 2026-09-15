@@ -183,6 +183,25 @@ pub fn parse_unblinded_manifest(json: &str) -> Result<UnblindedManifest, Package
     })
 }
 
+#[derive(Deserialize)]
+struct BlindedManifestWire {
+    config: StudyConfig,
+}
+
+/// Extract study configuration from `manifest.blinded.json`.
+///
+/// Does not require or validate `seed_hex` (blinded manifest omits it).
+///
+/// # Errors
+///
+/// Returns [`PackageError::BlindedManifestJsonParse`] when JSON is invalid.
+pub fn parse_blinded_manifest(json: &str) -> Result<StudyConfig, PackageError> {
+    let trimmed = json.trim_end_matches('\n');
+    let wire: BlindedManifestWire =
+        serde_json::from_str(trimmed).map_err(|_| PackageError::BlindedManifestJsonParse)?;
+    Ok(wire.config)
+}
+
 fn list_csv_header_columns(factor_names: &[&str]) -> Vec<String> {
     let mut header = vec!["randomization_number".to_owned()];
     header.extend(factor_names.iter().map(|name| (*name).to_owned()));

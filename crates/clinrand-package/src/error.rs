@@ -73,6 +73,8 @@ pub enum PackageError {
     },
     /// `manifest.unblinded.json` is not valid JSON for the expected shape.
     ManifestJsonParse,
+    /// `manifest.blinded.json` is not valid JSON for the expected shape.
+    BlindedManifestJsonParse,
     /// `seed_hex` is not exactly 64 characters.
     InvalidSeedHexLength,
     /// `seed_hex` is not lowercase hexadecimal.
@@ -142,6 +144,9 @@ impl fmt::Display for PackageError {
                 write!(f, "checksums.txt lists `{path}` more than once")
             }
             Self::ManifestJsonParse => write!(f, "manifest.unblinded.json is not valid JSON"),
+            Self::BlindedManifestJsonParse => {
+                write!(f, "manifest.blinded.json is not valid JSON")
+            }
             Self::InvalidSeedHexLength => {
                 write!(f, "invalid seed_hex length (expected 64 hex characters)")
             }
@@ -167,6 +172,7 @@ impl std::error::Error for PackageError {
             | Self::ChecksumsInvalidDigest { .. }
             | Self::ChecksumsDuplicatePath { .. }
             | Self::ManifestJsonParse
+            | Self::BlindedManifestJsonParse
             | Self::InvalidSeedHexLength
             | Self::InvalidSeedHexEncoding => None,
             Self::Canonical(err) => Some(err),

@@ -61,27 +61,22 @@ fn list_methods_json_prints_array() {
 }
 
 #[test]
-fn stub_commands_exit_check_failure() {
-    for (args, name) in [
-        (vec!["verify", "--package", "/tmp/pkg"], "verify"),
-        (vec!["validation-report"], "validation-report"),
-    ] {
-        let output = clinrand()
-            .args(&args)
-            .output()
-            .unwrap_or_else(|e| panic!("run clinrand {name}: {e}"));
-        assert_eq!(
-            output.status.code(),
-            Some(1),
-            "{name} should exit 1, stderr: {}",
-            stderr(&output)
-        );
-        let stderr = stderr(&output);
-        assert!(
-            stderr.contains("not yet implemented"),
-            "{name} stderr: {stderr}"
-        );
-    }
+fn validation_report_stub_exits_check_failure() {
+    let output = clinrand()
+        .arg("validation-report")
+        .output()
+        .expect("run clinrand validation-report");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "validation-report should exit 1, stderr: {}",
+        stderr(&output)
+    );
+    let err = stderr(&output);
+    assert!(
+        err.contains("not yet implemented"),
+        "validation-report stderr: {err}"
+    );
 }
 
 fn stdout(output: &std::process::Output) -> String {
