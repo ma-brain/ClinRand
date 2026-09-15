@@ -11,6 +11,7 @@
   let allowLargeStrata = $state(false);
   let showConfirm = $state(false);
   let generating = $state(false);
+  let pickerError = $state<string | null>(null);
   let generateError = $state<string | null>(null);
   let outcome = $state<GenerateOutcome | null>(null);
 
@@ -61,6 +62,7 @@
   });
 
   async function pickDirectory(): Promise<void> {
+    pickerError = null;
     try {
       const selected = await open({
         directory: true,
@@ -71,7 +73,7 @@
         outDir = selected;
       }
     } catch (err) {
-      generateError =
+      pickerError =
         err instanceof Error ? err.message : "Could not open folder picker.";
     }
   }
@@ -197,6 +199,12 @@
       {/if}
     </p>
   </div>
+  {#if pickerError}
+    <div class="panel error" role="alert">
+      <p class="panel-title">Could not choose folder</p>
+      <p class="panel-body">{pickerError}</p>
+    </div>
+  {/if}
 </section>
 
 {#if $config.method === "stratified_block"}
