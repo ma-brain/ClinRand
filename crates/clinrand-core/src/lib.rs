@@ -21,11 +21,13 @@ mod config;
 mod rng;
 mod stream;
 mod uniform;
+mod validate;
 
 pub use config::{Arm, BlockScheme, Method, NumberingScheme, StratificationFactor, StudyConfig};
 pub use rng::Rng;
 pub use stream::{DrawPurpose, StreamDraw, StreamLog};
 pub use uniform::{uniform_below, U64Draw, UniformError};
+pub use validate::{validate_config, ConfigError, ConfigWarning, ValidateOptions};
 
 #[cfg(test)]
 mod tests {

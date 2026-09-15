@@ -14,6 +14,8 @@ rand_chacha = "=0.3.1"
 rand_core = "=0.6.4"
 # JSON (de)serialization of StudyConfig; required by the crate-boundary table.
 serde = { version = "=1.0.229", features = ["derive"] }
+# Typed ConfigError for validate_config (plan §5.2). Exact pin: validation surface.
+thiserror = "=2.0.20"
 
 [dev-dependencies]
 # JSON fixtures for StudyConfig serde round-trip tests only.

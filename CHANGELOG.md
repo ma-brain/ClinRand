@@ -10,6 +10,9 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- `validate_config` in `clinrand-core` with every plan §5.2 reject
+  rule, plus warnings for non-multiple `list_length_per_stratum` and
+  `per_stratum_range` numbering disclosure (plan §5.6).
 - `StudyConfig` types and JSON serde in `clinrand-core`, matching plan
   §4 / §5.1 (`method` string plus sibling `block` / `numbering`).
 - Phase 0 workspace scaffold: `clinrand-core`, `clinrand-package`,
