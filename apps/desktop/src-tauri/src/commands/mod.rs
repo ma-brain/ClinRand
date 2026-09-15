@@ -8,12 +8,14 @@
 
 pub mod about;
 pub mod config;
+pub mod decrypt;
 pub mod generate;
 pub mod validation;
 pub mod verify;
 
 pub use about::get_about;
 pub use config::{preview_structure, validate_config_json};
+pub use decrypt::decrypt_package;
 pub use generate::generate_package;
 pub use validation::run_validation_report;
 pub use verify::verify_package;

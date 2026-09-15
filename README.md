@@ -28,10 +28,12 @@ to **myIWRS**, a separate web application.
 
 ## Status
 
-Phases 1–7 are implemented: the engine, package writer, CLI, emitted
-`qc.R`, and the Tauri 2 + SvelteKit **desktop application** (all §11.1
-screens, capability lock-down, and [`docs/security-posture.md`](docs/security-posture.md)).
-Phase 8 (encryption at rest, tagged installers) is next. See
+Phases 1–8 are implemented: the engine, package writer, CLI, emitted
+`qc.R`, the Tauri 2 + SvelteKit **desktop application** (all §11.1
+screens, capability lock-down, and [`docs/security-posture.md`](docs/security-posture.md)),
+encryption at rest (`--encrypt` / `decrypt`, [`docs/output-package.md`](docs/output-package.md) §10),
+and a tagged release workflow ([`docs/release.md`](docs/release.md)).
+Phase 9 (validation completeness and the operator handbook) is next. See
 [`TODO.md`](TODO.md), [`docs/cli.md`](docs/cli.md),
 [`docs/qc-procedure.md`](docs/qc-procedure.md),
 [`apps/desktop/README.md`](apps/desktop/README.md), and

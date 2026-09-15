@@ -20,6 +20,8 @@ chrono = { version = "=0.4.41", default-features = false, features = ["clock", "
 # OS entropy for seed draw — only call site in workspace source. Exact pin: entropy surface.
 getrandom = { version = "=0.3.4", default-features = false, features = ["std"] }
 serde_json = "=1.0.151"
+# Hidden-input passphrase prompts for `--encrypt` / `decrypt`. Exact pin: input surface.
+rpassword = "=7.5.4"
 
 [dev-dependencies]
 clinrand-core = { path = "../clinrand-core" }

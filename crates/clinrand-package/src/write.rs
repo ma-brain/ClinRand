@@ -56,6 +56,78 @@ pub fn write_package(
     seed: &[u8; 32],
     meta: &PackageMeta,
 ) -> Result<PathBuf, PackageError> {
+    let rendered = render_package(cfg, list, seed, meta)?;
+
+    let package_dir = out_dir.join(&rendered.dir_name);
+    if package_dir.exists() {
+        return Err(PackageError::PackageDirExists { path: package_dir });
+    }
+    fs::create_dir_all(&package_dir).map_err(PackageError::from)?;
+
+    let contents: [(&str, &[u8]); 8] = [
+        (
+            "generation-report.html",
+            rendered.generation_report.as_bytes(),
+        ),
+        ("list.csv", rendered.list_csv.as_bytes()),
+        ("list.json", rendered.list_json.as_bytes()),
+        (
+            "manifest.blinded.json",
+            rendered.manifests.blinded.as_bytes(),
+        ),
+        (
+            "manifest.unblinded.json",
+            rendered.manifests.unblinded.as_bytes(),
+        ),
+        ("qc.R", rendered.qc_r.as_bytes()),
+        ("stream.csv", rendered.stream_csv.as_bytes()),
+        (
+            "unblinded-report.html",
+            rendered.unblinded_report.as_bytes(),
+        ),
+    ];
+
+    debug_assert_eq!(
+        contents.len(),
+        PACKAGE_FILES.len(),
+        "checksum set must match PACKAGE_FILES"
+    );
+    for &(name, bytes) in &contents {
+        write_file(&package_dir.join(name), bytes)?;
+    }
+
+    let checksums = render_checksums_txt(&contents);
+    write_file(&package_dir.join("checksums.txt"), checksums.as_bytes())?;
+
+    Ok(package_dir)
+}
+
+/// Every rendered byte of a package, before any file is written to disk.
+///
+/// Shared by [`write_package`] and `write_package_encrypted` (`crate::encrypt`)
+/// so both writers derive identical content from `(cfg, list, seed, meta)` —
+/// only which files land on disk as plaintext differs.
+pub(crate) struct RenderedPackage {
+    pub(crate) list_csv: String,
+    pub(crate) list_json: String,
+    pub(crate) stream_csv: String,
+    pub(crate) manifests: crate::manifest::ManifestPair,
+    pub(crate) generation_report: String,
+    pub(crate) unblinded_report: String,
+    pub(crate) qc_r: String,
+    /// SHA-256 (lowercase hex) of `list.csv` bytes — also the package
+    /// directory name's hash suffix.
+    pub(crate) list_sha256: String,
+    /// `<study_id>_<generated_at compact>_<first 8 hex of list_sha256>`.
+    pub(crate) dir_name: String,
+}
+
+pub(crate) fn render_package(
+    cfg: &StudyConfig,
+    list: &GeneratedList,
+    seed: &[u8; 32],
+    meta: &PackageMeta,
+) -> Result<RenderedPackage, PackageError> {
     let list_csv = render_list_csv(cfg, list)?;
     let list_json = render_list_json(cfg, list)?;
     let stream_csv = render_stream_csv(&list.stream)?;
@@ -82,33 +154,18 @@ pub fn write_package(
         compact_generated_at(&meta.generated_at),
         &list_sha256[..8]
     );
-    let package_dir = out_dir.join(dir_name);
 
-    if package_dir.exists() {
-        return Err(PackageError::PackageDirExists { path: package_dir });
-    }
-
-    fs::create_dir_all(&package_dir).map_err(PackageError::from)?;
-
-    let contents: [(&str, &[u8]); 8] = [
-        ("generation-report.html", generation_report.as_bytes()),
-        ("list.csv", list_csv.as_bytes()),
-        ("list.json", list_json.as_bytes()),
-        ("manifest.blinded.json", manifests.blinded.as_bytes()),
-        ("manifest.unblinded.json", manifests.unblinded.as_bytes()),
-        ("qc.R", qc_r.as_bytes()),
-        ("stream.csv", stream_csv.as_bytes()),
-        ("unblinded-report.html", unblinded_report.as_bytes()),
-    ];
-
-    for &(name, bytes) in &contents {
-        write_file(&package_dir.join(name), bytes)?;
-    }
-
-    let checksums = render_checksums_txt(&contents);
-    write_file(&package_dir.join("checksums.txt"), checksums.as_bytes())?;
-
-    Ok(package_dir)
+    Ok(RenderedPackage {
+        list_csv,
+        list_json,
+        stream_csv,
+        manifests,
+        generation_report,
+        unblinded_report,
+        qc_r,
+        list_sha256,
+        dir_name,
+    })
 }
 
 /// Normalize `generated_at` for the package directory name.
@@ -124,14 +181,10 @@ pub fn compact_generated_at(generated_at: &str) -> String {
 }
 
 /// `checksums.txt` body: GNU `sha256sum` text mode (`hex  filename`),
-/// one line per package file **except** `checksums.txt` itself, sorted by
-/// filename, each line ending in `\n`.
-fn render_checksums_txt(contents: &[(&str, &[u8])]) -> String {
-    debug_assert_eq!(
-        contents.len(),
-        PACKAGE_FILES.len(),
-        "checksum set must match PACKAGE_FILES"
-    );
+/// one line per file in `contents`, sorted by filename, each line ending in
+/// `\n`. Generic over the file set — `write_package` passes all 8 package
+/// files; `write_package_encrypted` (`crate::encrypt`) passes its 4.
+pub(crate) fn render_checksums_txt(contents: &[(&str, &[u8])]) -> String {
     let mut pairs: Vec<(&str, &[u8])> = contents.to_vec();
     pairs.sort_by(|a, b| a.0.cmp(b.0));
     pairs
@@ -140,7 +193,7 @@ fn render_checksums_txt(contents: &[(&str, &[u8])]) -> String {
         .collect()
 }
 
-fn write_file(path: &Path, bytes: &[u8]) -> Result<(), PackageError> {
+pub(crate) fn write_file(path: &Path, bytes: &[u8]) -> Result<(), PackageError> {
     fs::write(path, bytes).map_err(PackageError::from)
 }
 

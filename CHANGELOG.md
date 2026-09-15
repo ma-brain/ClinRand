@@ -10,6 +10,30 @@ is never changed as a side effect of another change.
 
 ### Added
 
+- Phase 8 hardening and release complete: encryption at rest and a tagged
+  release workflow (plan §12). `--encrypt` on `generate`/`reproduce` (CLI)
+  and an "Encrypt restricted files" option on the desktop Generate screen
+  wrap `list.csv`, `list.json`, `manifest.unblinded.json`, `stream.csv`, and
+  `unblinded-report.html` into a single `restricted.age` container —
+  XChaCha20-Poly1305 AEAD with an Argon2id-derived key
+  (`docs/decisions/0007-restricted-container-format.md`,
+  `docs/output-package.md` §10). No plaintext restricted file is written
+  when `--encrypt` is used. New `clinrand decrypt --package <dir>` CLI
+  command and desktop decrypt flow reverse this **in place**, so `qc.R` and
+  `verify` work unchanged afterward
+  (`docs/decisions/0008-cli-decrypt-command-and-passphrase-ux.md`); CLI
+  passphrase entry is a hidden terminal prompt (double-entry on encrypt,
+  single on decrypt) with a piped-stdin fallback for scripting and tests.
+  New CLI exit code 5 (`PassphraseFailure`). `verify_package` /
+  `VerifyReport` gained `properties_checked`, skipping property checks
+  (never failing them) for an un-decrypted encrypted package.
+  `.github/workflows/release.yml`: a `v*` tag builds unsigned macOS (both
+  architectures), Windows NSIS, and Linux `.deb`/AppImage installers via
+  `tauri-apps/tauri-action`, publishes them to a GitHub Release, and adds a
+  `SHA256SUMS.txt` a downloader can verify with `sha256sum -c`
+  (`docs/release.md`, `docs/decisions/0009-unsigned-release-installers.md`).
+  `ALGO_VERSION` unchanged (1) — nothing here touches allocation
+  determinism; `clinrand-core` is untouched.
 - Phase 7 desktop application complete: Tauri 2 + SvelteKit (static SPA,
   `ssr=false`) app with all plan §11.1 screens — config builder with live
   validation, blinded structure preview, generate (with unblinded-material

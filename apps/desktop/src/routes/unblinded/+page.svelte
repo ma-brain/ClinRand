@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 
   const REPORT_FILE = "unblinded-report.html";
+  const RESTRICTED_CONTAINER = "restricted.age";
   const ACCESS_LOG_FILE = "access-log.txt";
 
   let lastPackageDir = $state<string | null>(null);
@@ -20,6 +22,16 @@
   let revealing = $state(false);
   let reportHtml = $state<string | null>(null);
   let revealError = $state<string | null>(null);
+
+  // Set when the access-logged directory's restricted files are still
+  // encrypted (`restricted.age` present, no plaintext `unblinded-report.html`
+  // yet). The passphrase prompt below decrypts in place, then the normal
+  // reveal path below runs unchanged.
+  let pendingDecryptDir = $state<string | null>(null);
+  let needsPassphrase = $state(false);
+  let passphrase = $state("");
+  let decrypting = $state(false);
+  let decryptError = $state<string | null>(null);
 
   // Monotonic request token. Each reveal increments it; the async helper only
   // commits its results if its captured token is still current, so an earlier,
@@ -168,15 +180,42 @@
       return;
     }
 
-    try {
-      const path = joinPath(dir, REPORT_FILE);
-      const present = await exists(path);
+    const path = joinPath(dir, REPORT_FILE);
+    const reportPresent = await exists(path).catch(() => false);
+    if (token !== loadToken) return;
+
+    if (!reportPresent) {
+      const containerPresent = await exists(
+        joinPath(dir, RESTRICTED_CONTAINER),
+      ).catch(() => false);
       if (token !== loadToken) return;
-      if (!present) {
-        reportHtml = null;
-        revealError = `This folder does not contain ${REPORT_FILE}. Confirm you selected a ClinRand package directory.`;
+      if (containerPresent) {
+        // Encrypted package: stop here and ask for the passphrase. Nothing
+        // has been revealed — only file *presence* was checked, not content.
+        pendingDecryptDir = dir;
+        needsPassphrase = true;
+        decryptError = null;
+        revealing = false;
+        pendingDir = null;
         return;
       }
+      revealing = false;
+      pendingDir = null;
+      revealedDir = null;
+      revealError = `This folder does not contain ${REPORT_FILE}. Confirm you selected a ClinRand package directory.`;
+      return;
+    }
+
+    await revealReport(dir, path, token);
+  }
+
+  /** Read and display `REPORT_FILE` at `path`, committing only if `token` is still current. */
+  async function revealReport(
+    dir: string,
+    path: string,
+    token: number,
+  ): Promise<void> {
+    try {
       const html = await readTextFile(path);
       if (token !== loadToken) return;
       reportHtml = html;
@@ -194,6 +233,43 @@
         pendingDir = null;
       }
     }
+  }
+
+  function cancelPassphrase(): void {
+    needsPassphrase = false;
+    pendingDecryptDir = null;
+    passphrase = "";
+    decryptError = null;
+  }
+
+  async function submitPassphrase(): Promise<void> {
+    const dir = pendingDecryptDir;
+    if (dir === null || passphrase.length === 0) return;
+
+    const token = ++loadToken;
+    decrypting = true;
+    decryptError = null;
+    revealedDir = dir;
+
+    try {
+      await invoke("decrypt_package", { packageDir: dir, passphrase });
+    } catch (err) {
+      if (token !== loadToken) return;
+      decryptError =
+        err instanceof Error ? err.message : "Could not decrypt the package.";
+      decrypting = false;
+      return;
+    } finally {
+      // Never leave a passphrase sitting in a JS variable longer than needed.
+      passphrase = "";
+    }
+
+    if (token !== loadToken) return;
+    needsPassphrase = false;
+    pendingDecryptDir = null;
+    revealing = true;
+    decrypting = false;
+    await revealReport(dir, joinPath(dir, REPORT_FILE), token);
   }
 </script>
 
@@ -253,6 +329,45 @@
       <p class="panel-title" id="reveal-error-heading">Unblinded view not opened</p>
       <p class="panel-body">{revealError}</p>
     </div>
+  </section>
+{/if}
+
+{#if needsPassphrase}
+  <section class="card" aria-labelledby="passphrase-heading">
+    <h2 id="passphrase-heading">Restricted files are encrypted</h2>
+    <p class="section-note">
+      This package's restricted files are wrapped in <code>restricted.age</code>.
+      Enter the passphrase used at generation time to decrypt them in place and
+      continue to the unblinded report.
+    </p>
+    <label>
+      <span>Passphrase</span>
+      <input
+        type="password"
+        bind:value={passphrase}
+        autocomplete="current-password"
+        disabled={decrypting}
+      />
+    </label>
+    <div class="row">
+      <button
+        type="button"
+        class="primary"
+        onclick={submitPassphrase}
+        disabled={decrypting || passphrase.length === 0}
+      >
+        {decrypting ? "Decrypting…" : "Decrypt and reveal"}
+      </button>
+      <button type="button" class="secondary" onclick={cancelPassphrase} disabled={decrypting}>
+        Cancel
+      </button>
+    </div>
+    {#if decryptError}
+      <div class="panel error" role="alert">
+        <p class="panel-title">Could not decrypt package</p>
+        <p class="panel-body">{decryptError}</p>
+      </div>
+    {/if}
   </section>
 {/if}
 
@@ -365,6 +480,31 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    max-width: 22rem;
+  }
+
+  input[type="password"] {
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9375rem;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   .path-display {

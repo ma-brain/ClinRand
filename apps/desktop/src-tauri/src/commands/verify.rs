@@ -17,8 +17,13 @@ pub struct VerifyOutcome {
     pub ok: bool,
     /// True when every file matches its `checksums.txt` digest.
     pub checksums_ok: bool,
-    /// True when all required property checks pass.
+    /// True when all required property checks pass, or trivially true when
+    /// [`Self::properties_checked`] is `false`.
     pub properties_ok: bool,
+    /// False when the package's restricted files are still encrypted in
+    /// `restricted.age` — property checks need the plaintext list and were
+    /// skipped. Decrypt the package first to enable them.
+    pub properties_checked: bool,
     /// Human-readable checksum failures.
     pub checksum_failures: Vec<String>,
     /// Human-readable required property failures (`Pxx: detail`).
@@ -41,6 +46,7 @@ pub fn verify_package(package_dir: String) -> Result<VerifyOutcome, String> {
         ok: report.ok(),
         checksums_ok: report.checksums_ok,
         properties_ok: report.properties_ok,
+        properties_checked: report.properties_checked,
         checksum_failures: report.checksum_failures,
         property_failures: report.property_failures,
     })
@@ -81,6 +87,7 @@ mod tests {
             dir.to_string_lossy().to_string(),
             "tester".to_string(),
             false,
+            None,
         )
         .expect("generate");
 
@@ -88,6 +95,42 @@ mod tests {
         assert!(outcome.ok, "outcome: {outcome:?}");
         assert!(outcome.checksums_ok);
         assert!(outcome.properties_ok);
+        assert!(outcome.properties_checked);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn verify_reports_properties_not_checked_for_an_encrypted_package() {
+        let dir = std::env::temp_dir().join(format!("clinrand-verify-enc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp out dir");
+        let config = r#"{
+            "schema_version": "1.0",
+            "study_id": "DEMO-779",
+            "protocol_version": "1.0",
+            "arms": [
+                { "code": "A", "label": "Active", "ratio": 1 },
+                { "code": "P", "label": "Placebo", "ratio": 1 }
+            ],
+            "method": "permuted_block",
+            "block": { "kind": "fixed", "size": 4 },
+            "strata": [],
+            "list_length_per_stratum": 8,
+            "numbering": { "kind": "global", "start": 10001, "width": 5 }
+        }"#;
+        let generated = crate::commands::generate::generate_package(
+            config.to_string(),
+            dir.to_string_lossy().to_string(),
+            "tester".to_string(),
+            false,
+            Some("verify test passphrase".to_string()),
+        )
+        .expect("generate encrypted");
+
+        let outcome = verify_package(generated.package_dir.clone()).expect("verify");
+        assert!(outcome.ok, "outcome: {outcome:?}");
+        assert!(outcome.checksums_ok);
+        assert!(!outcome.properties_checked);
 
         std::fs::remove_dir_all(&dir).ok();
     }

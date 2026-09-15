@@ -46,6 +46,10 @@ pub enum Command {
         /// Allow more than 200 stratum combinations.
         #[arg(long)]
         allow_large_strata: bool,
+        /// Encrypt restricted files into `restricted.age` (plan §6.6).
+        /// Prompts for a passphrase; no plaintext restricted file is written.
+        #[arg(long)]
+        encrypt: bool,
     },
 
     /// Reproduce a list from an unblinded manifest.
@@ -56,6 +60,21 @@ pub enum Command {
         /// Output directory for the reproduced package.
         #[arg(long)]
         out: String,
+        /// Encrypt restricted files into `restricted.age` (plan §6.6).
+        /// Prompts for a passphrase; no plaintext restricted file is written.
+        #[arg(long)]
+        encrypt: bool,
+    },
+
+    /// Decrypt a package's `restricted.age` container in place.
+    ///
+    /// Prompts for the passphrase and writes `list.csv`, `list.json`,
+    /// `manifest.unblinded.json`, `stream.csv`, and `unblinded-report.html`
+    /// directly into `--package`. Refuses to overwrite any that already exist.
+    Decrypt {
+        /// Path to the package directory containing `restricted.age`.
+        #[arg(long)]
+        package: String,
     },
 
     /// Verify package checksums and properties without regenerating.

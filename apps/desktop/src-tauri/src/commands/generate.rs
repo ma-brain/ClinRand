@@ -18,7 +18,9 @@ use chrono::Utc;
 use clinrand_core::{
     generate_with_options, validate_config, GenerationError, StudyConfig, ValidateOptions,
 };
-use clinrand_package::{render_list_csv, sha256_hex, write_package, PackageError, PackageMeta};
+use clinrand_package::{
+    render_list_csv, sha256_hex, write_package, write_package_encrypted, PackageError, PackageMeta,
+};
 use serde::Serialize;
 
 use crate::seed::draw_seed;
@@ -42,16 +44,24 @@ pub struct GenerateOutcome {
 /// draw in this crate), allocates the list, and writes the package. Returns
 /// the package path, `list_sha256`, record count, and warnings.
 ///
+/// When `passphrase` is `Some`, the restricted files (`list.csv`, `list.json`,
+/// `manifest.unblinded.json`, `stream.csv`, `unblinded-report.html`) are
+/// written encrypted into `restricted.age` instead of as plaintext (plan
+/// §6.6). The passphrase is never returned to the frontend, logged, or
+/// included in any error string — same rule as the seed.
+///
 /// # Errors
 ///
 /// Returns a human-readable error string on parse, validation, generation, or
-/// I/O failure. Error strings never contain the seed (see module docs).
+/// I/O failure. Error strings never contain the seed or the passphrase (see
+/// module docs).
 #[tauri::command]
 pub fn generate_package(
     config_json: String,
     out_dir: String,
     operator: String,
     allow_large_strata: bool,
+    passphrase: Option<String>,
 ) -> Result<GenerateOutcome, String> {
     let cfg: StudyConfig = serde_json::from_str(&config_json)
         .map_err(|err| format!("could not parse config JSON: {err}"))?;
@@ -96,8 +106,13 @@ pub fn generate_package(
         .map(|csv| sha256_hex(csv.as_bytes()))
         .map_err(package_error_message)?;
 
-    let package_dir = write_package(Path::new(&out_dir), &cfg, &list, &seed, &meta)
-        .map_err(package_error_message)?;
+    let package_dir = match &passphrase {
+        Some(passphrase) => {
+            write_package_encrypted(Path::new(&out_dir), &cfg, &list, &seed, &meta, passphrase)
+        }
+        None => write_package(Path::new(&out_dir), &cfg, &list, &seed, &meta),
+    }
+    .map_err(package_error_message)?;
 
     Ok(GenerateOutcome {
         package_dir: package_dir.display().to_string(),
@@ -163,6 +178,7 @@ mod tests {
             dir.to_string_lossy().to_string(),
             "tester".to_string(),
             false,
+            None,
         )
         .expect("generate");
 
@@ -195,6 +211,7 @@ mod tests {
             dir.to_string_lossy().to_string(),
             "tester".to_string(),
             false,
+            None,
         )
         .unwrap_err();
         assert!(err.contains("validation failed"), "got: {err}");
@@ -208,8 +225,47 @@ mod tests {
             dir.to_string_lossy().to_string(),
             "tester".to_string(),
             false,
+            None,
         )
         .unwrap_err();
         assert!(err.contains("could not parse"));
+    }
+
+    #[test]
+    fn generate_with_passphrase_writes_restricted_age_and_no_plaintext_restricted_files() {
+        let dir = std::env::temp_dir().join(format!("clinrand-gen-enc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp out dir");
+
+        let outcome = generate_package(
+            CONFIG.to_string(),
+            dir.to_string_lossy().to_string(),
+            "tester".to_string(),
+            false,
+            Some("desktop test passphrase".to_string()),
+        )
+        .expect("generate encrypted");
+
+        let package_dir = Path::new(&outcome.package_dir);
+        assert!(package_dir.join("restricted.age").is_file());
+        for name in [
+            "list.csv",
+            "list.json",
+            "manifest.unblinded.json",
+            "stream.csv",
+            "unblinded-report.html",
+        ] {
+            assert!(
+                !package_dir.join(name).exists(),
+                "{name} must not exist as plaintext when encrypted"
+            );
+        }
+
+        let json = serde_json::to_string(&outcome).expect("serialize outcome");
+        assert!(
+            !json.contains("passphrase"),
+            "outcome must not mention passphrase"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

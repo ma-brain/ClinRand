@@ -68,6 +68,7 @@ fn full_command_flow_validate_preview_generate_verify() {
         dir.to_string_lossy().to_string(),
         "DEMO operator".to_string(),
         false,
+        None,
     )
     .expect("generate_package");
 

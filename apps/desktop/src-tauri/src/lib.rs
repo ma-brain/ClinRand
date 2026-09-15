@@ -24,6 +24,7 @@ pub fn run() {
             commands::config::validate_config_json,
             commands::config::preview_structure,
             commands::generate::generate_package,
+            commands::decrypt::decrypt_package,
             commands::verify::verify_package,
             commands::validation::run_validation_report,
         ])

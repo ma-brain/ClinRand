@@ -28,6 +28,7 @@ fn emit_report(json: bool, report: &VerifyReport) -> ExitCode {
             "ok": report.ok(),
             "checksums_ok": report.checksums_ok,
             "properties_ok": report.properties_ok,
+            "properties_checked": report.properties_checked,
             "checksum_failures": report.checksum_failures,
             "property_failures": report.property_failures,
         });
@@ -35,7 +36,12 @@ fn emit_report(json: bool, report: &VerifyReport) -> ExitCode {
             return ExitCode::IoError;
         }
     } else if report.ok() {
-        if write_stdout("verify ok\n").is_err() {
+        let line = if report.properties_checked {
+            "verify ok\n"
+        } else {
+            "verify ok (properties not checked: package is still encrypted; run `decrypt` first)\n"
+        };
+        if write_stdout(line).is_err() {
             return ExitCode::IoError;
         }
     } else {
