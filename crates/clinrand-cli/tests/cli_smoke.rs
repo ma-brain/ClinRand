@@ -64,10 +64,6 @@ fn list_methods_json_prints_array() {
 fn stub_commands_exit_check_failure() {
     for (args, name) in [
         (
-            vec!["validate-config", "--config", "missing.json"],
-            "validate-config",
-        ),
-        (
             vec![
                 "generate",
                 "--config",

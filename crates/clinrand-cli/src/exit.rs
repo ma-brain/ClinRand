@@ -9,7 +9,6 @@ pub enum ExitCode {
     /// Check or verification failure.
     CheckFailure = 1,
     /// Configuration validation failure.
-    #[expect(dead_code, reason = "used by validate-config in Task 2")]
     InvalidConfig = 2,
     /// I/O or parse failure.
     IoError = 3,

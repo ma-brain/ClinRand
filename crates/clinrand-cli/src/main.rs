@@ -7,14 +7,15 @@
 #![deny(clippy::all)]
 
 mod cli;
+mod commands;
 mod exit;
-
-use std::io::{self, Write};
+mod output;
 
 use clap::Parser;
 use cli::{Cli, Command};
 use clinrand_core::{ALGO_VERSION, ENGINE_VERSION};
 use exit::ExitCode;
+use output::{write_stderr, write_stdout};
 
 fn main() {
     let cli = Cli::parse();
@@ -26,8 +27,11 @@ fn dispatch(cli: &Cli) -> ExitCode {
     match &cli.command {
         Command::Version => run_version(cli.json),
         Command::ListMethods => run_list_methods(cli.json),
-        Command::ValidateConfig { .. }
-        | Command::Generate { .. }
+        Command::ValidateConfig {
+            config,
+            allow_large_strata,
+        } => commands::validate_config::run(cli.json, config, *allow_large_strata),
+        Command::Generate { .. }
         | Command::Reproduce { .. }
         | Command::Verify { .. }
         | Command::ValidationReport { .. } => stub_not_implemented(&cli.command),
@@ -86,12 +90,4 @@ fn command_name(command: &Command) -> &'static str {
         Command::ValidationReport { .. } => "validation-report",
         Command::Version => "version",
     }
-}
-
-fn write_stdout(text: &str) -> io::Result<()> {
-    io::stdout().write_all(text.as_bytes())
-}
-
-fn write_stderr(text: &str) -> io::Result<()> {
-    io::stderr().write_all(text.as_bytes())
 }
